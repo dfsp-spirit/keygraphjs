@@ -6,12 +6,12 @@
  * The JSON it reads/writes:
  *   {
  *     "meta": { "name": "...", "description": "..." },
- *     "nodes": [ { "id": "C1", "label": "crown", "group": "A" }, ... ],
+ *     "nodes": [ { "id": "C1", "label": "crown", "group": "A", "weight": 0.5 }, ... ],
  *     "edges": [ { "source": "C1", "target": "C2", "weight": 0.90 }, ... ]
  *   }
  *
- * `nodes[].id`, `edges[].source/target/weight` carry the graph data; `label` and
- * `group` are human metadata; `x`/`y` are optional layout hints.
+ * `nodes[].id`, `nodes[].weight`, `edges[].source/target/weight` carry the graph
+ * data; `label` and `group` are human metadata; `x`/`y` are optional layout hints.
  */
 (function () {
   'use strict';
@@ -53,7 +53,7 @@
     n = n || NUM_NODES;
     var nodes = [];
     for (var i = 0; i < n; i++) {
-      nodes.push({ id: nodeId(i), label: nodeId(i), group: '' });
+      nodes.push({ id: nodeId(i), label: nodeId(i), group: '', weight: DEFAULT_WEIGHT });
     }
     var edges = [];
     for (var a = 0; a < n; a++) {
@@ -77,7 +77,7 @@
       var group = communityA.indexOf(id) >= 0 ? 'A'
                 : communityB.indexOf(id) >= 0 ? 'B'
                 : 'hub';
-      nodes.push({ id: id, label: id, group: group });
+      nodes.push({ id: id, label: id, group: group, weight: nodeWeight(id) });
     }
 
     var edges = [];
@@ -102,6 +102,12 @@
       if (uHub !== vHub) return 0.65; // hub <-> leaf
       return 0.05; // cross-community leaf <-> leaf
     }
+
+    function nodeWeight(id) {
+      // Hubs are "heavier". Values avoid colliding with edge weights so they
+      // stay unambiguous in exported files (edges: 0.90/0.65/0.35/0.05).
+      return hubs.indexOf(id) >= 0 ? 0.75 : 0.50;
+    }
   }
 
   // -------------------------------------------------------------- normalization
@@ -118,6 +124,7 @@
         id: String(n.id),
         label: n.label !== undefined && n.label !== null ? String(n.label) : String(n.id),
         group: (n.group !== undefined && n.group !== null) ? String(n.group) : '',
+        weight: clampWeight(n.weight),
         x: (typeof n.x === 'number') ? n.x : undefined,
         y: (typeof n.y === 'number') ? n.y : undefined
       };
@@ -150,11 +157,17 @@
     return 'hsl(' + Math.round(140 * w) + ', 65%, 42%)';
   }
 
+  function nodeSize(w) {
+    return 12 + 22 * clampWeight(w); // heavier nodes draw larger
+  }
+
   function visNodeObject(n) {
     var c = groupColor(n.group);
     var out = {
       id: n.id,
       label: n.label || n.id,
+      size: nodeSize(n.weight),
+      title: 'weight ' + Number(n.weight).toFixed(2),
       color: { background: c, border: c, highlight: { background: c, border: c } }
     };
     if (typeof n.x === 'number' && typeof n.y === 'number') { out.x = n.x; out.y = n.y; }
@@ -343,7 +356,7 @@
   function addNode() {
     var id = nextNodeId();
     var pos = centroidPosition();
-    var n = { id: id, label: id, group: '', x: pos.x, y: pos.y };
+    var n = { id: id, label: id, group: '', weight: DEFAULT_WEIGHT, x: pos.x, y: pos.y };
     graph.nodes.push(n);
     network.body.data.nodes.add(visNodeObject(n));
     renderNodeList();
@@ -461,11 +474,42 @@
       del.title = 'Remove this node (and its edges)';
       del.addEventListener('click', function () { deleteNode(n.id); });
 
+      // second line: vertex weight slider (mirrors the edge rows)
+      var weightLine = document.createElement('div');
+      weightLine.className = 'node-weight-line';
+
+      var weightLabel = document.createElement('span');
+      weightLabel.className = 'node-wlabel';
+      weightLabel.textContent = 'w';
+      weightLabel.title = 'Vertex weight (0\u20131)';
+
+      var weightSlider = document.createElement('input');
+      weightSlider.type = 'range';
+      weightSlider.min = 0;
+      weightSlider.max = 1;
+      weightSlider.step = 0.01;
+      weightSlider.value = n.weight;
+
+      var weightVal = document.createElement('span');
+      weightVal.className = 'node-val';
+      weightVal.textContent = Number(n.weight).toFixed(2);
+
+      weightSlider.addEventListener('input', function () {
+        n.weight = Number(weightSlider.value);
+        weightVal.textContent = n.weight.toFixed(2);
+        network.body.data.nodes.update(visNodeObject(n));
+      });
+
+      weightLine.appendChild(weightLabel);
+      weightLine.appendChild(weightSlider);
+      weightLine.appendChild(weightVal);
+
       row.appendChild(idSpan);
       row.appendChild(swatch);
       row.appendChild(labelInput);
       row.appendChild(groupInput);
       row.appendChild(del);
+      row.appendChild(weightLine);
       el.appendChild(row);
     });
   }
@@ -685,6 +729,7 @@
       l.push('    id ' + nodeIndex(n.id));
       l.push('    label "' + escapeQuoted(n.label || n.id) + '"');
       if (n.group) l.push('    group "' + escapeQuoted(n.group) + '"');
+      if (typeof n.weight === 'number') l.push('    weight ' + n.weight.toFixed(6));
       if (typeof n.x === 'number' && typeof n.y === 'number') {
         l.push('    graphics [');
         l.push('      x ' + roundNum(n.x));
@@ -718,6 +763,7 @@
     l.push('  <key id="d_name" for="graph" attr.name="name" attr.type="string"/>');
     l.push('  <key id="d_desc" for="graph" attr.name="description" attr.type="string"/>');
     l.push('  <key id="d_label" for="node" attr.name="label" attr.type="string"/>');
+    l.push('  <key id="d_w" for="node" attr.name="weight" attr.type="double"/>');
     if (hasGroup) l.push('  <key id="d_group" for="node" attr.name="group" attr.type="string"/>');
     if (hasPos) {
       l.push('  <key id="d_x" for="node" attr.name="x" attr.type="double"/>');
@@ -730,6 +776,7 @@
     graph.nodes.forEach(function (n) {
       l.push('    <node id="' + escapeXml(n.id) + '">');
       l.push('      <data key="d_label">' + escapeXml(n.label || n.id) + '</data>');
+      l.push('      <data key="d_w">' + n.weight.toFixed(6) + '</data>');
       if (n.group) l.push('      <data key="d_group">' + escapeXml(n.group) + '</data>');
       if (typeof n.x === 'number' && typeof n.y === 'number') {
         l.push('      <data key="d_x">' + roundNum(n.x) + '</data>');
@@ -754,6 +801,7 @@
     graph.nodes.forEach(function (n) {
       var attrs = [];
       if (n.label && n.label !== n.id) attrs.push('label="' + escapeQuoted(n.label) + '"');
+      if (typeof n.weight === 'number') attrs.push('weight=' + n.weight.toFixed(6));
       if (n.group) attrs.push('group="' + escapeQuoted(n.group) + '"');
       if (typeof n.x === 'number' && typeof n.y === 'number') {
         attrs.push('pos="' + roundNum(n.x) + ',' + roundNum(n.y) + '"');

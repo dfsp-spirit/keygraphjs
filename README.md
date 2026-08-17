@@ -12,6 +12,7 @@ Keygraph.js lets you:
 - drag nodes and run a one-shot force-directed **auto-layout** (with undo),
 - add and remove nodes, and connect nodes to add edges,
 - edit edge **weights** (0–1) per edge, or select several and set them all at once,
+- set a **node weight** (0–1) per node — heavier nodes draw larger and export with the weight,
 - give nodes human-readable **names** and arbitrary **groups** (colors are assigned automatically),
 - toggle edge-weight labels in the view, and
 - **load and save** graphs as JSON via the file dialog, and **export** them to
@@ -35,9 +36,10 @@ graph format that other tools can read:
 - **DOT** (`.dot`) — Graphviz's graph description language, great for rendering:
   `dot -Tpng graph.dot -o graph.png`.
 
-Node labels, groups and edge weights are preserved in all three; node positions
-(x/y) are included where the format supports them. Note that in DOT the
-`weight` attribute also acts as a layout hint for Graphviz.
+Node labels, groups, edge weights and node weights are preserved in all three;
+node positions (x/y) are included where the format supports them. Note that in
+DOT the edge `weight` attribute also acts as a layout hint for Graphviz, and DOT
+has no native node weight — it is emitted there as a custom attribute.
 
 ## Development
 

@@ -261,23 +261,28 @@ test('saves a JSON file with name and positions', async ({ page }) => {
   expect(json.nodes.every((n) => typeof n.x === 'number' && typeof n.y === 'number')).toBe(true);
 });
 
-test('exports GML, GraphML and DOT files', async ({ page }) => {
+test('exports GML, GraphML and DOT files with edge and node weights', async ({ page }) => {
   await page.fill('#graphName', 'My Test Graph');
   const count = (text, needle) => text.split(needle).length - 1; // literal substring count
   const cases = [
     {
       fmt: 'gml', ext: 'gml', marker: 'graph [',
       nodes: (t) => count(t, '  node ['), edges: (t) => count(t, '  edge ['),
+      // node weights are 0.75 (hubs) and 0.50 (leaves); edge weights are
+      // 0.90/0.65/0.35/0.05, so these values only ever come from nodes.
+      weights: (t) => [count(t, '0.750000'), count(t, '0.500000')],
     },
     {
       fmt: 'graphml', ext: 'graphml', marker: '<graphml',
       nodes: (t) => count(t, '<node '), edges: (t) => count(t, '<edge '),
+      weights: (t) => [count(t, '<data key="d_w">0.750000</data>'), count(t, '<data key="d_w">0.500000</data>')],
     },
     {
       fmt: 'dot', ext: 'dot', marker: 'graph G {',
       // Node statements are lines starting with a quoted id that are not edges.
       nodes: (t) => t.split('\n').filter((ln) => ln.startsWith('  "') && !ln.includes(' -- ')).length,
       edges: (t) => count(t, ' -- '),
+      weights: (t) => [count(t, 'weight=0.750000'), count(t, 'weight=0.500000')],
     },
   ];
   for (const c of cases) {
@@ -291,8 +296,20 @@ test('exports GML, GraphML and DOT files', async ({ page }) => {
     expect(text).toContain(c.marker);
     expect(c.nodes(text)).toBe(8);
     expect(c.edges(text)).toBe(28);
+    expect(c.weights(text)).toEqual([2, 6]); // 2 hub nodes + 6 leaf nodes
     await expect(page.locator('#exportMenu')).toBeHidden(); // menu closes after export
   }
+});
+
+test('editing a node weight updates its value and draw size', async ({ page }) => {
+  const row = page.locator('#nodeList .node-row').first();
+  await row.locator('input[type="range"]').evaluate((el, v) => {
+    el.value = v;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  }, '0.77');
+  await expect(row.locator('.node-val')).toHaveText('0.77');
+  const size = await page.evaluate(() => window.__graphEditor.body.data.nodes.get('C1').size);
+  expect(size).toBeCloseTo(12 + 22 * 0.77, 2);
 });
 
 test('loads a graph file', async ({ page }) => {
