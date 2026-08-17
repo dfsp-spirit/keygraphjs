@@ -1,0 +1,51 @@
+{
+  "meta": {
+    "name": "A/B/hub example",
+    "description": "Communities A (C1-C3) and B (C4-C6), hubs C7/C8. Weights: within-community 0.90, hub-leaf 0.65, hub-hub 0.35, cross-community leaf 0.05."
+  },
+  "nodes": [
+    { "id": "C1", "label": "C1", "group": "A" },
+    { "id": "C2", "label": "C2", "group": "A" },
+    { "id": "C3", "label": "C3", "group": "A" },
+    { "id": "C4", "label": "C4", "group": "B" },
+    { "id": "C5", "label": "C5", "group": "B" },
+    { "id": "C6", "label": "C6", "group": "B" },
+    { "id": "C7", "label": "C7", "group": "hub" },
+    { "id": "C8", "label": "C8", "group": "hub" }
+  ],
+  "edges": [
+    { "source": "C1", "target": "C2", "weight": 0.90 },
+    { "source": "C1", "target": "C3", "weight": 0.90 },
+    { "source": "C2", "target": "C3", "weight": 0.90 },
+
+    { "source": "C4", "target": "C5", "weight": 0.90 },
+    { "source": "C4", "target": "C6", "weight": 0.90 },
+    { "source": "C5", "target": "C6", "weight": 0.90 },
+
+    { "source": "C7", "target": "C1", "weight": 0.65 },
+    { "source": "C7", "target": "C2", "weight": 0.65 },
+    { "source": "C7", "target": "C3", "weight": 0.65 },
+    { "source": "C7", "target": "C4", "weight": 0.65 },
+    { "source": "C7", "target": "C5", "weight": 0.65 },
+    { "source": "C7", "target": "C6", "weight": 0.65 },
+
+    { "source": "C8", "target": "C1", "weight": 0.65 },
+    { "source": "C8", "target": "C2", "weight": 0.65 },
+    { "source": "C8", "target": "C3", "weight": 0.65 },
+    { "source": "C8", "target": "C4", "weight": 0.65 },
+    { "source": "C8", "target": "C5", "weight": 0.65 },
+    { "source": "C8", "target": "C6", "weight": 0.65 },
+
+    { "source": "C7", "target": "C8", "weight": 0.35 },
+
+    { "source": "C1", "target": "C4", "weight": 0.05 },
+    { "source": "C1", "target": "C5", "weight": 0.05 },
+    { "source": "C1", "target": "C6", "weight": 0.05 },
+    { "source": "C2", "target": "C4", "weight": 0.05 },
+    { "source": "C2", "target": "C5", "weight": 0.05 },
+    { "source": "C2", "target": "C6", "weight": 0.05 },
+    { "source": "C3", "target": "C4", "weight": 0.05 },
+    { "source": "C3", "target": "C5", "weight": 0.05 },
+    { "source": "C3", "target": "C6", "weight": 0.05 }
+  ]
+}

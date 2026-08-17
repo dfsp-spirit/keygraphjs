@@ -1,0 +1,13 @@
+{
+  "meta": { "name": "small test graph", "description": "Fixture for the load test." },
+  "nodes": [
+    { "id": "C1", "label": "alpha", "group": "A" },
+    { "id": "C2", "label": "beta", "group": "B" },
+    { "id": "C3", "label": "gamma", "group": "hub" }
+  ],
+  "edges": [
+    { "source": "C1", "target": "C2", "weight": 0.90 },
+    { "source": "C1", "target": "C3", "weight": 0.50 },
+    { "source": "C2", "target": "C3", "weight": 0.10 }
+  ]
+}
