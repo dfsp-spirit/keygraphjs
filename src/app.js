@@ -711,14 +711,187 @@
     setMessage('Saved JSON (' + graph.nodes.length + ' nodes, ' + graph.edges.length + ' edges).');
   }
 
+  // ------------------------------------------------------------------- import
+
+  function detectFormat(text) {
+    var s = String(text).replace(/^\uFEFF/, '').replace(/^\s+/, '').toLowerCase();
+    if (s.indexOf('<graphml') >= 0) return 'graphml';
+    if (/^graph\s*\[/m.test(String(text))) return 'gml';
+    return 'json';
+  }
+
+  // ---- GML (plain-text; node ids are integers, labels are strings) ----
+
+  function tokenizeGML(text) {
+    var tokens = [];
+    var i = 0, n = text.length;
+    while (i < n) {
+      var ch = text[i];
+      if (ch === '#') { while (i < n && text[i] !== '\n') i++; continue; }
+      if (ch === '[' || ch === ']') { tokens.push(ch); i++; continue; }
+      if (/\s/.test(ch)) { i++; continue; }
+      if (ch === '"') {
+        var str = '';
+        i++;
+        while (i < n && text[i] !== '"') {
+          if (text[i] === '\\' && i + 1 < n && (text[i + 1] === '"' || text[i + 1] === '\\')) {
+            str += text[i + 1]; i += 2; continue;
+          }
+          str += text[i]; i++;
+        }
+        tokens.push(str);
+        i++;
+        continue;
+      }
+      var j = i;
+      while (j < n && !/\s/.test(text[j]) && text[j] !== '[' && text[j] !== ']' && text[j] !== '#') j++;
+      tokens.push(text.slice(i, j));
+      i = j;
+    }
+    return tokens;
+  }
+
+  // Recursively parse "key value" pairs inside a "[ ... ]" block. Repeated
+  // keys (e.g. node/edge) become arrays.
+  function parseGMLList(tokens, pos) {
+    var items = {};
+    pos++; // skip '['
+    while (pos < tokens.length && tokens[pos] !== ']') {
+      var key = tokens[pos]; pos++;
+      var val;
+      if (tokens[pos] === '[') {
+        var sub = parseGMLList(tokens, pos);
+        val = sub.value; pos = sub.next;
+      } else {
+        val = tokens[pos]; pos++;
+      }
+      if (Object.prototype.hasOwnProperty.call(items, key)) {
+        if (!Array.isArray(items[key])) items[key] = [items[key]];
+        items[key].push(val);
+      } else {
+        items[key] = val;
+      }
+    }
+    return { value: items, next: pos + 1 }; // skip ']'
+  }
+
+  function asArray(v) { return Array.isArray(v) ? v : (v === undefined ? [] : [v]); }
+
+  function parseGML(text) {
+    var tokens = tokenizeGML(text);
+    if (tokens[0] !== 'graph') throw new Error('not a GML file (expected "graph [")');
+    var g = parseGMLList(tokens, 1).value;
+    if (String(g.directed) === '1') throw new Error('directed graphs are not supported');
+    var meta = { name: g.label || '', description: g.comment || '' };
+    var nodes = [], idToIdx = {};
+    asArray(g.node).forEach(function (nd, idx) {
+      var id = nd.id !== undefined ? String(nd.id) : 'N' + idx;
+      var graphics = Array.isArray(nd.graphics) ? nd.graphics[0] : nd.graphics;
+      nodes.push({
+        id: id,
+        label: nd.label !== undefined ? String(nd.label) : id,
+        group: nd.group !== undefined ? String(nd.group) : '',
+        weight: nd.weight !== undefined ? Number(nd.weight) : undefined,
+        x: graphics && graphics.x !== undefined ? Number(graphics.x) : undefined,
+        y: graphics && graphics.y !== undefined ? Number(graphics.y) : undefined
+      });
+      idToIdx[id] = nodes.length - 1;
+    });
+    var edges = [], seen = new Set();
+    asArray(g.edge).forEach(function (e) {
+      var s = String(e.source), t = String(e.target);
+      if (s === t) return; // self-loop
+      if (idToIdx[s] === undefined || idToIdx[t] === undefined) return; // dangling edge
+      var key = s < t ? s + '__' + t : t + '__' + s;
+      if (seen.has(key)) return; // parallel edges -> keep one
+      seen.add(key);
+      edges.push({ source: s, target: t, weight: e.weight !== undefined ? Number(e.weight) : undefined });
+    });
+    return { meta: meta, nodes: nodes, edges: edges };
+  }
+
+  // ---- GraphML (XML with typed attributes) ----
+
+  // Read the value of the <data> child whose key maps to the given attr.name.
+  function dataAttr(el, name, keys) {
+    for (var i = 0; i < el.children.length; i++) {
+      var d = el.children[i];
+      if (d.tagName !== 'data') continue;
+      if (keys[d.getAttribute('key')] === name) return d.textContent;
+    }
+    return undefined;
+  }
+
+  function parseGraphML(text) {
+    var doc = new DOMParser().parseFromString(text, 'application/xml');
+    if (doc.getElementsByTagName('parsererror').length) throw new Error('not valid GraphML XML');
+    var keys = {};
+    var keyEls = doc.getElementsByTagName('key');
+    for (var i = 0; i < keyEls.length; i++) {
+      var k = keyEls[i];
+      keys[k.getAttribute('id')] = k.getAttribute('attr.name');
+    }
+    var graphEl = doc.getElementsByTagName('graph')[0];
+    if (!graphEl) throw new Error('GraphML: no <graph> element');
+    if (graphEl.getAttribute('edgedefault') === 'directed') throw new Error('directed graphs are not supported');
+
+    var meta = {
+      name: dataAttr(graphEl, 'name', keys) || '',
+      description: dataAttr(graphEl, 'description', keys) || ''
+    };
+
+    var nodes = [], nodeIds = new Set();
+    var nodeEls = doc.getElementsByTagName('node');
+    for (var a = 0; a < nodeEls.length; a++) {
+      var el = nodeEls[a];
+      var id = el.getAttribute('id');
+      var w = dataAttr(el, 'weight', keys);
+      var x = dataAttr(el, 'x', keys);
+      var y = dataAttr(el, 'y', keys);
+      nodeIds.add(id);
+      nodes.push({
+        id: id,
+        label: dataAttr(el, 'label', keys) || id,
+        group: dataAttr(el, 'group', keys) || '',
+        weight: w !== undefined ? Number(w) : undefined,
+        x: x !== undefined ? Number(x) : undefined,
+        y: y !== undefined ? Number(y) : undefined
+      });
+    }
+
+    var edges = [], seen = new Set();
+    var edgeEls = doc.getElementsByTagName('edge');
+    for (var b = 0; b < edgeEls.length; b++) {
+      if (edgeEls[b].getAttribute('directed') === 'true') throw new Error('directed graphs are not supported');
+      var s = edgeEls[b].getAttribute('source');
+      var t = edgeEls[b].getAttribute('target');
+      if (s === t) continue; // self-loop
+      if (!nodeIds.has(s) || !nodeIds.has(t)) continue; // dangling edge
+      var ek = s < t ? s + '__' + t : t + '__' + s;
+      if (seen.has(ek)) continue; // parallel edges -> keep one
+      seen.add(ek);
+      var ew = dataAttr(edgeEls[b], 'weight', keys);
+      edges.push({ source: s, target: t, weight: ew !== undefined ? Number(ew) : undefined });
+    }
+    return { meta: meta, nodes: nodes, edges: edges };
+  }
+
+  function parseGraphFile(text) {
+    var fmt = detectFormat(text);
+    if (fmt === 'graphml') return parseGraphML(text);
+    if (fmt === 'gml') return parseGML(text);
+    var parsed = JSON.parse(text);
+    if (!Array.isArray(parsed.nodes) || !Array.isArray(parsed.edges)) {
+      throw new Error('file must contain "nodes" and "edges" arrays');
+    }
+    return parsed;
+  }
+
   function loadFromFile(file) {
     var reader = new FileReader();
     reader.onload = function () {
       try {
-        var parsed = JSON.parse(reader.result);
-        if (!Array.isArray(parsed.nodes) || !Array.isArray(parsed.edges)) {
-          throw new Error('file must contain "nodes" and "edges" arrays');
-        }
+        var parsed = parseGraphFile(reader.result);
         graph = normalize(parsed);
         rebuild();
         setMessage('Loaded "' + (graph.meta.name || '(unnamed)') + '" (' +

@@ -15,8 +15,8 @@ Keygraph.js lets you:
 - set a **node weight** (0–1) per node — heavier nodes draw larger and export with the weight,
 - give nodes human-readable **names** and arbitrary **groups** (colors are assigned automatically),
 - toggle edge-weight labels in the view, and
-- **load and save** graphs as JSON via the file dialog, and **export** them to
-  standard graph formats (GML, GraphML, DOT) for use in other tools.
+- **load and save** graphs in JSON or standard formats (GML, GraphML) via the
+  file dialog, and **export** them to GML, GraphML or DOT for other tools.
 
 Open `index.html` directly (works fully offline) or serve it as static files — for example via
 GitHub Pages.
@@ -25,10 +25,11 @@ GitHub Pages.
 
 **[dfsp-spirit.github.io/keygraphjs](https://dfsp-spirit.github.io/keygraphjs/)**
 
-## Export
+## Import & Export
 
-The **Export…** button in the toolbar writes the current graph to a standard
-graph format that other tools can read:
+**Load file…** opens graphs in JSON, **GML** and **GraphML** (the format is
+auto-detected from the file content), so graphs saved by other tools load
+directly. **Export…** writes the current graph to a standard format:
 
 - **GML** (`.gml`) — compact, plain-text format (igraph, NetworkX, Gephi, yEd).
 - **GraphML** (`.graphml`) — XML with typed attributes; the most widely supported
@@ -37,9 +38,11 @@ graph format that other tools can read:
   `dot -Tpng graph.dot -o graph.png`.
 
 Node labels, groups, edge weights and node weights are preserved in all three;
-node positions (x/y) are included where the format supports them. Note that in
-DOT the edge `weight` attribute also acts as a layout hint for Graphviz, and DOT
-has no native node weight — it is emitted there as a custom attribute.
+node positions (x/y) are included where the format supports them. GML node ids
+are integers, so on import they become the node ids and the labels carry the
+names. Note that in DOT the edge `weight` attribute also acts as a layout hint
+for Graphviz, and DOT has no native node weight — it is emitted there as a
+custom attribute.
 
 ## Development
 

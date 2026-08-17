@@ -1,0 +1,214 @@
+{
+  "meta": {
+    "name": "A/B/hub example",
+    "description": "Communities A and B, hubs C7/C8 (README weights)."
+  },
+  "nodes": [
+    {
+      "id": "C1",
+      "label": "C1",
+      "group": "A",
+      "weight": 0.1,
+      "x": -1066,
+      "y": -57
+    },
+    {
+      "id": "C2",
+      "label": "C2",
+      "group": "A",
+      "weight": 0.4,
+      "x": -951,
+      "y": -159
+    },
+    {
+      "id": "C3",
+      "label": "C3",
+      "group": "A",
+      "weight": 0.1,
+      "x": -952,
+      "y": 75
+    },
+    {
+      "id": "C4",
+      "label": "C4",
+      "group": "B",
+      "weight": 0.1,
+      "x": 377,
+      "y": 22
+    },
+    {
+      "id": "C5",
+      "label": "C5",
+      "group": "B",
+      "weight": 0.46,
+      "x": 348,
+      "y": -172
+    },
+    {
+      "id": "C6",
+      "label": "C6",
+      "group": "B",
+      "weight": 0.1,
+      "x": 162,
+      "y": -79
+    },
+    {
+      "id": "C7",
+      "label": "C7",
+      "group": "hub",
+      "weight": 0.1,
+      "x": -363,
+      "y": 471
+    },
+    {
+      "id": "C8",
+      "label": "C8",
+      "group": "hub",
+      "weight": 0.1,
+      "x": -369,
+      "y": -276
+    }
+  ],
+  "edges": [
+    {
+      "source": "C1",
+      "target": "C2",
+      "weight": 0.9
+    },
+    {
+      "source": "C1",
+      "target": "C3",
+      "weight": 0.9
+    },
+    {
+      "source": "C1",
+      "target": "C4",
+      "weight": 0.05
+    },
+    {
+      "source": "C1",
+      "target": "C5",
+      "weight": 0.05
+    },
+    {
+      "source": "C1",
+      "target": "C6",
+      "weight": 0.05
+    },
+    {
+      "source": "C1",
+      "target": "C7",
+      "weight": 0.65
+    },
+    {
+      "source": "C1",
+      "target": "C8",
+      "weight": 0.65
+    },
+    {
+      "source": "C2",
+      "target": "C3",
+      "weight": 0.9
+    },
+    {
+      "source": "C2",
+      "target": "C4",
+      "weight": 0.05
+    },
+    {
+      "source": "C2",
+      "target": "C5",
+      "weight": 0.05
+    },
+    {
+      "source": "C2",
+      "target": "C6",
+      "weight": 0.05
+    },
+    {
+      "source": "C2",
+      "target": "C7",
+      "weight": 0.65
+    },
+    {
+      "source": "C2",
+      "target": "C8",
+      "weight": 0.65
+    },
+    {
+      "source": "C3",
+      "target": "C4",
+      "weight": 0.05
+    },
+    {
+      "source": "C3",
+      "target": "C5",
+      "weight": 0.05
+    },
+    {
+      "source": "C3",
+      "target": "C6",
+      "weight": 0.05
+    },
+    {
+      "source": "C3",
+      "target": "C7",
+      "weight": 0.65
+    },
+    {
+      "source": "C3",
+      "target": "C8",
+      "weight": 0.65
+    },
+    {
+      "source": "C4",
+      "target": "C5",
+      "weight": 0.9
+    },
+    {
+      "source": "C4",
+      "target": "C6",
+      "weight": 0.9
+    },
+    {
+      "source": "C4",
+      "target": "C7",
+      "weight": 0.65
+    },
+    {
+      "source": "C4",
+      "target": "C8",
+      "weight": 0.65
+    },
+    {
+      "source": "C5",
+      "target": "C6",
+      "weight": 0.9
+    },
+    {
+      "source": "C5",
+      "target": "C7",
+      "weight": 0.65
+    },
+    {
+      "source": "C5",
+      "target": "C8",
+      "weight": 0.65
+    },
+    {
+      "source": "C6",
+      "target": "C7",
+      "weight": 0.65
+    },
+    {
+      "source": "C6",
+      "target": "C8",
+      "weight": 0.65
+    },
+    {
+      "source": "C7",
+      "target": "C8",
+      "weight": 0.35
+    }
+  ]
+}

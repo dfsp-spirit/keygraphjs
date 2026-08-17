@@ -482,3 +482,29 @@ test('loads a graph file', async ({ page }) => {
   await expect(page.locator('#nodeList .node-row')).toHaveCount(3);
   await expect(page.locator('#edgeList .edge-row')).toHaveCount(3);
 });
+
+test('loads a GraphML file', async ({ page }) => {
+  const [chooser] = await Promise.all([
+    page.waitForEvent('filechooser'),
+    page.click('#btnLoad'),
+  ]);
+  await chooser.setFiles(path.join(__dirname, 'fixtures', 'A_B_hub_example.graphml'));
+  await settle(page);
+  await expect(page.locator('#nodeList .node-row')).toHaveCount(8);
+  await expect(page.locator('#edgeList .edge-row')).toHaveCount(28);
+  await expect(page.locator('#graphName')).toHaveValue('A/B/hub example');
+  await expect(page.locator('#nodeList .node-row').first().locator('.node-name')).toHaveText('C1');
+});
+
+test('loads a GML file', async ({ page }) => {
+  const [chooser] = await Promise.all([
+    page.waitForEvent('filechooser'),
+    page.click('#btnLoad'),
+  ]);
+  await chooser.setFiles(path.join(__dirname, 'fixtures', 'A_B_hub_example.gml'));
+  await settle(page);
+  await expect(page.locator('#nodeList .node-row')).toHaveCount(8);
+  await expect(page.locator('#edgeList .edge-row')).toHaveCount(28);
+  // GML node ids are integers (0..7); the human labels (C1…) survive
+  await expect(page.locator('#nodeList .node-row').first().locator('.node-name')).toHaveText('C1');
+});
