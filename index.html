@@ -87,6 +87,29 @@
     font-size: 13px;
   }
   .export-menu button:hover { background: #f1f5f9; }
+  #contextMenu {
+    position: fixed;
+    z-index: 50;
+    min-width: 170px;
+    padding: 4px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.18);
+  }
+  #contextMenu[hidden] { display: none; }
+  #contextMenu button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    border: none;
+    background: none;
+    border-radius: 4px;
+    padding: 7px 10px;
+    font-size: 13px;
+  }
+  #contextMenu button:hover { background: #f1f5f9; }
+  #contextMenu button.danger { color: var(--danger); }
   main { flex: 1 1 auto; display: flex; min-height: 0; }
   #network { flex: 1 1 auto; border-right: 1px solid var(--border); background: #fff; }
   #resizer {
@@ -203,6 +226,7 @@
 </main>
 <input type="file" id="fileInput" accept=".json,application/json" hidden />
 <datalist id="groupOptions"></datalist>
+<div id="contextMenu" hidden></div>
 <script src="vendor/vis-network.min.js"></script>
 <script src="src/app.js"></script>
 </body>

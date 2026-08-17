@@ -890,6 +890,110 @@
     document.getElementById('exportMenu').hidden = true;
   }
 
+  // ---------------------------------------------------------- context menu
+
+  function findEdgeByVisKey(key) {
+    return graph.edges.find(function (e) {
+      return e.source + '__' + e.target === key || e.target + '__' + e.source === key;
+    });
+  }
+
+  function hideContextMenu() {
+    document.getElementById('contextMenu').hidden = true;
+  }
+
+  function showContextMenu(x, y, items) {
+    if (!items || items.length === 0) return;
+    var menu = document.getElementById('contextMenu');
+    menu.innerHTML = '';
+    items.forEach(function (item) {
+      var btn = document.createElement('button');
+      btn.textContent = item.label;
+      if (item.danger) btn.className = 'danger';
+      btn.addEventListener('click', function () {
+        hideContextMenu();
+        item.action();
+      });
+      menu.appendChild(btn);
+    });
+    menu.hidden = false;
+    // Keep the menu fully on screen near the cursor.
+    var r = menu.getBoundingClientRect();
+    var px = Math.max(4, Math.min(x, window.innerWidth - r.width - 4));
+    var py = Math.max(4, Math.min(y, window.innerHeight - r.height - 4));
+    menu.style.left = px + 'px';
+    menu.style.top = py + 'px';
+  }
+
+  // The hidden name/group editor lives in the node list; open (and scroll to) it.
+  function openNodeEditor(id) {
+    var row = getNodeRow(id);
+    if (!row) return;
+    var editLine = row.querySelector('.node-edit-line');
+    if (editLine && editLine.hidden) {
+      var editBtn = row.querySelector('.node-edit');
+      if (editBtn) editBtn.click();
+    }
+    row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+
+  function nodeContextMenu(id) {
+    return [
+      { label: 'Edit name / group', action: function () { openNodeEditor(id); } },
+      { label: 'Delete node', danger: true, action: function () { deleteNode(id); } }
+    ];
+  }
+
+  function edgeContextMenu(key) {
+    var e = findEdgeByVisKey(key);
+    if (!e) return [];
+    return [
+      { label: 'Jump to in list', action: function () { highlightEdgeRows([key]); } },
+      { label: 'Delete edge', danger: true, action: function () { deleteEdge(e.source, e.target); } }
+    ];
+  }
+
+  function canvasContextMenu() {
+    return [
+      { label: 'Add node', action: addNode },
+      { label: 'Auto-layout', action: runAutoLayout }
+    ];
+  }
+
+  // Edges are thin curves, so probe a small neighborhood around the pointer to
+  // make right-clicking an edge forgiving.
+  function edgeAtPointer(x, y) {
+    var e = network.getEdgeAt({ x: x, y: y });
+    if (e) return e;
+    for (var dx = -4; dx <= 4; dx += 2) {
+      for (var dy = -4; dy <= 4; dy += 2) {
+        if (dx === 0 && dy === 0) continue;
+        e = network.getEdgeAt({ x: x + dx, y: y + dy });
+        if (e) return e;
+      }
+    }
+    return null;
+  }
+
+  function onCanvasContextMenu(evt) {
+    if (!network) return;
+    var rect = document.getElementById('network').getBoundingClientRect();
+    var x = evt.clientX - rect.left;
+    var y = evt.clientY - rect.top;
+    evt.preventDefault();
+    var nodeId = network.getNodeAt({ x: x, y: y });
+    if (nodeId) {
+      showContextMenu(evt.clientX, evt.clientY, nodeContextMenu(nodeId));
+      return;
+    }
+    var edgeId = edgeAtPointer(x, y);
+    if (edgeId) {
+      showContextMenu(evt.clientX, evt.clientY, edgeContextMenu(edgeId));
+      return;
+    }
+    showContextMenu(evt.clientX, evt.clientY, canvasContextMenu());
+  }
+
   // --------------------------------------------------------------------- ui
 
   function rebuild() {
@@ -1103,6 +1207,13 @@
       var wrap = document.getElementById('exportWrap');
       if (wrap && !wrap.contains(evt.target)) closeExportMenu();
     });
+    document.getElementById('network').addEventListener('contextmenu', onCanvasContextMenu);
+    document.addEventListener('click', hideContextMenu);
+    document.addEventListener('keydown', function (evt) {
+      if (evt.key === 'Escape') hideContextMenu();
+    });
+    window.addEventListener('scroll', hideContextMenu, true);
+    window.addEventListener('resize', hideContextMenu);
     document.getElementById('fileInput').addEventListener('change', function (evt) {
       if (evt.target.files && evt.target.files[0]) loadFromFile(evt.target.files[0]);
       evt.target.value = '';

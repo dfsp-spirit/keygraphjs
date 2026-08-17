@@ -209,6 +209,88 @@ test('clicking empty canvas clears the vertex list highlight', async ({ page }) 
   await expect(page.locator('#nodeList .node-row.selected')).toHaveCount(0);
 });
 
+test('right-clicking a node offers edit and delete actions', async ({ page }) => {
+  const p = await graphPoints(page);
+  await page.mouse.click(p.nodes.C8.x, p.nodes.C8.y, { button: 'right' });
+  const menu = page.locator('#contextMenu');
+  await expect(menu).toBeVisible();
+  await expect(menu).toContainText('Edit name / group');
+  await expect(menu).toContainText('Delete node');
+});
+
+test('right-click delete removes the node', async ({ page }) => {
+  const p = await graphPoints(page);
+  await page.mouse.click(p.nodes.C8.x, p.nodes.C8.y, { button: 'right' });
+  await page.locator('#contextMenu button', { hasText: 'Delete node' }).click();
+  await expect(page.locator('#nodeList .node-row')).toHaveCount(7);
+  await expect(page.locator('#edgeList .edge-row')).toHaveCount(21); // C8 has 7 edges
+});
+
+test('right-clicking an edge deletes it', async ({ page }) => {
+  // find a viewport point that lies on the C3–C4 edge curve (not on a node)
+  const pt = await page.evaluate(() => {
+    const n = window.__graphEditor;
+    const P = n.getPositions();
+    const c = document.getElementById('network').getBoundingClientRect();
+    const vp = (x, y) => { const d = n.canvasToDOM({ x, y }); return { x: d.x + c.x, y: d.y + c.y }; };
+    const rel = (x, y) => ({ x: x - c.x, y: y - c.y });
+    const a = P['C3'], b = P['C4'];
+    for (const t of [0.5, 0.4, 0.6, 0.3, 0.7, 0.45, 0.55]) {
+      const q = vp(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t);
+      const r = rel(q.x, q.y);
+      if (!n.getNodeAt(r) && n.getEdgeAt(r)) return q;
+    }
+    return null;
+  });
+  expect(pt).not.toBeNull();
+  await page.mouse.click(pt.x, pt.y, { button: 'right' });
+  const menu = page.locator('#contextMenu');
+  await expect(menu).toBeVisible();
+  await expect(menu).toContainText('Delete edge');
+  await menu.locator('button', { hasText: 'Delete edge' }).click();
+  await expect(page.locator('#edgeList .edge-row')).toHaveCount(27);
+});
+
+test('right-clicking empty canvas adds a node', async ({ page }) => {
+  const far = await page.evaluate(() => {
+    const n = window.__graphEditor;
+    const P = n.getPositions();
+    const c = document.getElementById('network').getBoundingClientRect();
+    const corners = [
+      [c.x + 8, c.y + 8], [c.x + c.width - 8, c.y + 8],
+      [c.x + 8, c.y + c.height - 8], [c.x + c.width - 8, c.y + c.height - 8],
+    ];
+    let best = corners[0], bestD = -1;
+    for (const [cx, cy] of corners) {
+      let minD = Infinity;
+      for (const id of Object.keys(P)) {
+        const vp = n.canvasToDOM(P[id]);
+        minD = Math.min(minD, Math.hypot(cx - (c.x + vp.x), cy - (c.y + vp.y)));
+      }
+      if (minD > bestD) { bestD = minD; best = [cx, cy]; }
+    }
+    return { x: best[0], y: best[1] };
+  });
+  await page.mouse.click(far.x, far.y, { button: 'right' });
+  const menu = page.locator('#contextMenu');
+  await expect(menu).toBeVisible();
+  await expect(menu).toContainText('Add node');
+  await menu.locator('button', { hasText: 'Add node' }).click();
+  await expect(page.locator('#nodeList .node-row')).toHaveCount(9);
+});
+
+test('right-click menu closes on Escape and on outside click', async ({ page }) => {
+  const p = await graphPoints(page);
+  await page.mouse.click(p.nodes.C1.x, p.nodes.C1.y, { button: 'right' });
+  await expect(page.locator('#contextMenu')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#contextMenu')).toBeHidden();
+  await page.mouse.click(p.nodes.C2.x, p.nodes.C2.y, { button: 'right' });
+  await expect(page.locator('#contextMenu')).toBeVisible();
+  await page.mouse.click(p.nodes.C3.x, p.nodes.C3.y); // left-click elsewhere closes it
+  await expect(page.locator('#contextMenu')).toBeHidden();
+});
+
 test('clicking an edge highlights exactly that edge', async ({ page }) => {
   await clickEdge(page, 'C3', 'C4');
   await expect(page.locator('#edgeList .edge-row.selected')).toHaveCount(1);
@@ -248,6 +330,29 @@ test('deletes an edge via its ✕ button', async ({ page }) => {
 
 test('connects two nodes to add an edge', async ({ page }) => {
   await page.click('#btnAddNode'); // C9, no edges yet
+  // Park C9 at a clear on-screen spot: its default position (the graph
+  // centroid + random offset) can land on top of another node, which would
+  // make the connect click miss. Pick a corner far from every existing node.
+  await page.evaluate(() => {
+    const n = window.__graphEditor;
+    const P = n.getPositions();
+    const rect = document.getElementById('network').getBoundingClientRect();
+    const spots = [
+      [rect.width / 2, 30], [30, rect.height / 2],
+      [rect.width - 30, rect.height - 30], [rect.width / 2, rect.height - 30],
+    ];
+    let best = null, bestD = -1;
+    for (const [sx, sy] of spots) {
+      const cp = n.DOMtoCanvas({ x: sx, y: sy });
+      let minD = Infinity;
+      for (const id of Object.keys(P)) {
+        if (id === 'C9') continue;
+        minD = Math.min(minD, Math.hypot(cp.x - P[id].x, cp.y - P[id].y));
+      }
+      if (minD > bestD) { bestD = minD; best = cp; }
+    }
+    n.moveNode('C9', best.x, best.y);
+  });
   const p = await graphPoints(page);
   await page.click('#btnConnect');
   await page.mouse.click(p.nodes.C9.x, p.nodes.C9.y);
