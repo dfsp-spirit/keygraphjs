@@ -261,6 +261,40 @@ test('saves a JSON file with name and positions', async ({ page }) => {
   expect(json.nodes.every((n) => typeof n.x === 'number' && typeof n.y === 'number')).toBe(true);
 });
 
+test('exports GML, GraphML and DOT files', async ({ page }) => {
+  await page.fill('#graphName', 'My Test Graph');
+  const count = (text, needle) => text.split(needle).length - 1; // literal substring count
+  const cases = [
+    {
+      fmt: 'gml', ext: 'gml', marker: 'graph [',
+      nodes: (t) => count(t, '  node ['), edges: (t) => count(t, '  edge ['),
+    },
+    {
+      fmt: 'graphml', ext: 'graphml', marker: '<graphml',
+      nodes: (t) => count(t, '<node '), edges: (t) => count(t, '<edge '),
+    },
+    {
+      fmt: 'dot', ext: 'dot', marker: 'graph G {',
+      // Node statements are lines starting with a quoted id that are not edges.
+      nodes: (t) => t.split('\n').filter((ln) => ln.startsWith('  "') && !ln.includes(' -- ')).length,
+      edges: (t) => count(t, ' -- '),
+    },
+  ];
+  for (const c of cases) {
+    await page.click('#btnExport');
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      page.click(`#exportMenu button[data-format="${c.fmt}"]`),
+    ]);
+    expect(download.suggestedFilename()).toBe(`My_Test_Graph.${c.ext}`);
+    const text = fs.readFileSync(await download.path(), 'utf8');
+    expect(text).toContain(c.marker);
+    expect(c.nodes(text)).toBe(8);
+    expect(c.edges(text)).toBe(28);
+    await expect(page.locator('#exportMenu')).toBeHidden(); // menu closes after export
+  }
+});
+
 test('loads a graph file', async ({ page }) => {
   const [chooser] = await Promise.all([
     page.waitForEvent('filechooser'),

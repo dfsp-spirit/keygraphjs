@@ -62,6 +62,31 @@
   button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
   button:disabled { opacity: 0.45; cursor: default; }
   button:disabled:hover { background: #fff; }
+  .export-wrap { position: relative; }
+  .export-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    display: flex;
+    flex-direction: column;
+    min-width: 175px;
+    padding: 4px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.15);
+    z-index: 20;
+  }
+  .export-menu[hidden] { display: none; }
+  .export-menu button {
+    text-align: left;
+    border: none;
+    background: none;
+    border-radius: 4px;
+    padding: 7px 10px;
+    font-size: 13px;
+  }
+  .export-menu button:hover { background: #f1f5f9; }
   main { flex: 1 1 auto; display: flex; min-height: 0; }
   #network { flex: 1 1 auto; border-right: 1px solid var(--border); background: #fff; }
   #sidebar {
@@ -116,6 +141,14 @@
     <button id="btnSample" title="Example: communities A/B + hubs, README weights">Load sample</button>
     <button id="btnLoad">Load file…</button>
     <button id="btnSave">Save file…</button>
+    <div class="export-wrap" id="exportWrap">
+      <button id="btnExport" title="Export the graph in a standard graph format">Export…</button>
+      <div class="export-menu" id="exportMenu" hidden>
+        <button type="button" data-format="gml">GML (.gml)</button>
+        <button type="button" data-format="graphml">GraphML (.graphml)</button>
+        <button type="button" data-format="dot">DOT (.dot)</button>
+      </div>
+    </div>
     <button id="btnConnect" title="Click two nodes to add an edge between them">Connect nodes</button>
     <button id="btnDeleteEdge" title="Remove the currently selected edge">Delete selected edge</button>
     <button id="btnEdgeLabels" title="Show the weight next to each edge in the graph view">Edge labels: off</button>

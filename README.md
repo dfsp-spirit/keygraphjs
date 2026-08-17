@@ -14,7 +14,8 @@ Keygraph.js lets you:
 - edit edge **weights** (0–1) per edge, or select several and set them all at once,
 - give nodes human-readable **names** and arbitrary **groups** (colors are assigned automatically),
 - toggle edge-weight labels in the view, and
-- **load and save** graphs as JSON via the file dialog.
+- **load and save** graphs as JSON via the file dialog, and **export** them to
+  standard graph formats (GML, GraphML, DOT) for use in other tools.
 
 Open `index.html` directly (works fully offline) or serve it as static files — for example via
 GitHub Pages.
@@ -22,6 +23,21 @@ GitHub Pages.
 ## Live Demo
 
 **[dfsp-spirit.github.io/keygraphjs](https://dfsp-spirit.github.io/keygraphjs/)**
+
+## Export
+
+The **Export…** button in the toolbar writes the current graph to a standard
+graph format that other tools can read:
+
+- **GML** (`.gml`) — compact, plain-text format (igraph, NetworkX, Gephi, yEd).
+- **GraphML** (`.graphml`) — XML with typed attributes; the most widely supported
+  interchange format (NetworkX, Gephi, yEd, Cytoscape, …).
+- **DOT** (`.dot`) — Graphviz's graph description language, great for rendering:
+  `dot -Tpng graph.dot -o graph.png`.
+
+Node labels, groups and edge weights are preserved in all three; node positions
+(x/y) are included where the format supports them. Note that in DOT the
+`weight` attribute also acts as a layout hint for Graphviz.
 
 ## Development
 

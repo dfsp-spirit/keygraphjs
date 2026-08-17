@@ -594,19 +594,25 @@
 
   // ------------------------------------------------------------------- load/save
 
-  function saveToFile() {
-    syncPositions();
-    var json = JSON.stringify(graph, null, 2);
-    var blob = new Blob([json], { type: 'application/json' });
+  function baseFilename() {
+    return (graph.meta.name || '').trim().replace(/[^A-Za-z0-9_-]+/g, '_') || 'keygraph';
+  }
+
+  function downloadText(filename, text, mimeType) {
+    var blob = new Blob([text], { type: mimeType });
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
     a.href = url;
-    var base = (graph.meta.name || '').trim().replace(/[^A-Za-z0-9_-]+/g, '_');
-    a.download = (base || 'keygraph') + '.json';
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  }
+
+  function saveToFile() {
+    syncPositions();
+    downloadText(baseFilename() + '.json', JSON.stringify(graph, null, 2), 'application/json');
     setMessage('Saved JSON (' + graph.nodes.length + ' nodes, ' + graph.edges.length + ' edges).');
   }
 
@@ -627,6 +633,162 @@
       }
     };
     reader.readAsText(file);
+  }
+
+  // ------------------------------------------------------------------ export
+
+  var EXPORT_FORMATS = [
+    { id: 'gml', ext: 'gml', mime: 'application/x-gml', label: 'GML' },
+    { id: 'graphml', ext: 'graphml', mime: 'application/xml', label: 'GraphML' },
+    { id: 'dot', ext: 'dot', mime: 'text/vnd.graphviz', label: 'DOT' }
+  ];
+
+  function roundNum(x) { return Math.round(x * 100) / 100; }
+
+  function escapeQuoted(s) {
+    return String(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  }
+
+  function escapeXml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
+  }
+
+  function nodeIndex(id) {
+    for (var i = 0; i < graph.nodes.length; i++) {
+      if (graph.nodes[i].id === id) return i;
+    }
+    return -1;
+  }
+
+  // Only edges whose endpoints still exist (defensive; the editor removes
+  // incident edges when a node is deleted, so this is normally a no-op).
+  function liveEdges() {
+    return graph.edges.filter(function (e) {
+      return nodeIndex(e.source) >= 0 && nodeIndex(e.target) >= 0;
+    });
+  }
+
+  // GML: compact plain-text, read by igraph / NetworkX / Gephi / yEd.
+  function toGML() {
+    var l = ['graph ['];
+    l.push('  directed 0');
+    l.push('  id 0');
+    if (graph.meta.name) l.push('  label "' + escapeQuoted(graph.meta.name) + '"');
+    if (graph.meta.description) l.push('  comment "' + escapeQuoted(graph.meta.description) + '"');
+    graph.nodes.forEach(function (n) {
+      l.push('  node [');
+      l.push('    id ' + nodeIndex(n.id));
+      l.push('    label "' + escapeQuoted(n.label || n.id) + '"');
+      if (n.group) l.push('    group "' + escapeQuoted(n.group) + '"');
+      if (typeof n.x === 'number' && typeof n.y === 'number') {
+        l.push('    graphics [');
+        l.push('      x ' + roundNum(n.x));
+        l.push('      y ' + roundNum(n.y));
+        l.push('    ]');
+      }
+      l.push('  ]');
+    });
+    liveEdges().forEach(function (e) {
+      l.push('  edge [');
+      l.push('    source ' + nodeIndex(e.source));
+      l.push('    target ' + nodeIndex(e.target));
+      l.push('    weight ' + e.weight.toFixed(6));
+      l.push('  ]');
+    });
+    l.push(']');
+    return l.join('\n') + '\n';
+  }
+
+  // GraphML: XML with typed attributes; the most interoperable format.
+  function toGraphML() {
+    var hasGroup = graph.nodes.some(function (n) { return n.group; });
+    var hasPos = graph.nodes.some(function (n) {
+      return typeof n.x === 'number' && typeof n.y === 'number';
+    });
+    var l = [];
+    l.push('<?xml version="1.0" encoding="UTF-8"?>');
+    l.push('<graphml xmlns="http://graphml.graphdrawing.org/xmlns"');
+    l.push('         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"');
+    l.push('         xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd">');
+    l.push('  <key id="d_name" for="graph" attr.name="name" attr.type="string"/>');
+    l.push('  <key id="d_desc" for="graph" attr.name="description" attr.type="string"/>');
+    l.push('  <key id="d_label" for="node" attr.name="label" attr.type="string"/>');
+    if (hasGroup) l.push('  <key id="d_group" for="node" attr.name="group" attr.type="string"/>');
+    if (hasPos) {
+      l.push('  <key id="d_x" for="node" attr.name="x" attr.type="double"/>');
+      l.push('  <key id="d_y" for="node" attr.name="y" attr.type="double"/>');
+    }
+    l.push('  <key id="d_weight" for="edge" attr.name="weight" attr.type="double"/>');
+    l.push('  <graph id="G" edgedefault="undirected">');
+    l.push('    <data key="d_name">' + escapeXml(graph.meta.name) + '</data>');
+    l.push('    <data key="d_desc">' + escapeXml(graph.meta.description) + '</data>');
+    graph.nodes.forEach(function (n) {
+      l.push('    <node id="' + escapeXml(n.id) + '">');
+      l.push('      <data key="d_label">' + escapeXml(n.label || n.id) + '</data>');
+      if (n.group) l.push('      <data key="d_group">' + escapeXml(n.group) + '</data>');
+      if (typeof n.x === 'number' && typeof n.y === 'number') {
+        l.push('      <data key="d_x">' + roundNum(n.x) + '</data>');
+        l.push('      <data key="d_y">' + roundNum(n.y) + '</data>');
+      }
+      l.push('    </node>');
+    });
+    liveEdges().forEach(function (e) {
+      l.push('    <edge source="' + escapeXml(e.source) + '" target="' + escapeXml(e.target) + '">');
+      l.push('      <data key="d_weight">' + e.weight.toFixed(6) + '</data>');
+      l.push('    </edge>');
+    });
+    l.push('  </graph>');
+    l.push('</graphml>');
+    return l.join('\n') + '\n';
+  }
+
+  // DOT: Graphviz graph description language, handy for rendering.
+  function toDOT() {
+    var l = ['graph G {'];
+    if (graph.meta.name) l.push('  graph [label="' + escapeQuoted(graph.meta.name) + '"];');
+    graph.nodes.forEach(function (n) {
+      var attrs = [];
+      if (n.label && n.label !== n.id) attrs.push('label="' + escapeQuoted(n.label) + '"');
+      if (n.group) attrs.push('group="' + escapeQuoted(n.group) + '"');
+      if (typeof n.x === 'number' && typeof n.y === 'number') {
+        attrs.push('pos="' + roundNum(n.x) + ',' + roundNum(n.y) + '"');
+      }
+      l.push('  "' + escapeQuoted(n.id) + '"' + (attrs.length ? ' [' + attrs.join(', ') + ']' : '') + ';');
+    });
+    liveEdges().forEach(function (e) {
+      l.push('  "' + escapeQuoted(e.source) + '" -- "' + escapeQuoted(e.target) +
+        '" [weight=' + e.weight.toFixed(6) + '];');
+    });
+    l.push('}');
+    return l.join('\n') + '\n';
+  }
+
+  function exportGraph(format) {
+    syncPositions();
+    var fmt = EXPORT_FORMATS.find(function (f) { return f.id === format; });
+    if (!fmt) return;
+    var text = fmt.id === 'gml' ? toGML()
+             : fmt.id === 'graphml' ? toGraphML()
+             : toDOT();
+    downloadText(baseFilename() + '.' + fmt.ext, text, fmt.mime);
+    setMessage('Exported ' + fmt.label + ' (' + graph.nodes.length + ' nodes, ' +
+      graph.edges.length + ' edges).');
+  }
+
+  function toggleExportMenu() {
+    var menu = document.getElementById('exportMenu');
+    var wasHidden = menu.hidden;
+    menu.hidden = true;
+    if (wasHidden) menu.hidden = false;
+  }
+
+  function closeExportMenu() {
+    document.getElementById('exportMenu').hidden = true;
   }
 
   // --------------------------------------------------------------------- ui
@@ -770,6 +932,20 @@
       document.getElementById('fileInput').click();
     });
     document.getElementById('btnSave').addEventListener('click', saveToFile);
+    document.getElementById('btnExport').addEventListener('click', toggleExportMenu);
+    var exportBtns = document.querySelectorAll('#exportMenu button');
+    for (var i = 0; i < exportBtns.length; i++) {
+      (function (btn) {
+        btn.addEventListener('click', function () {
+          exportGraph(btn.getAttribute('data-format'));
+          closeExportMenu();
+        });
+      })(exportBtns[i]);
+    }
+    document.addEventListener('click', function (evt) {
+      var wrap = document.getElementById('exportWrap');
+      if (wrap && !wrap.contains(evt.target)) closeExportMenu();
+    });
     document.getElementById('fileInput').addEventListener('change', function (evt) {
       if (evt.target.files && evt.target.files[0]) loadFromFile(evt.target.files[0]);
       evt.target.value = '';
