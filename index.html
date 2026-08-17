@@ -35,13 +35,8 @@
   }
   header h1 { font-size: 16px; margin: 0; white-space: nowrap; }
   .toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-  .toolbar input[type="text"] {
-    padding: 6px 8px;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    font-size: 13px;
-    min-width: 180px;
-  }
+  .toolbar-group { display: flex; align-items: center; gap: 8px; }
+  .toolbar-group + .toolbar-group { margin-left: 4px; padding-left: 12px; border-left: 1px solid var(--border); }
   .toolbar input[type="number"] {
     padding: 6px 8px;
     border: 1px solid var(--border);
@@ -137,6 +132,14 @@
     margin: 16px 0 8px;
   }
   #sidebar h2:first-child { margin-top: 0; }
+  #sidebar .graph-name-input {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 13px;
+    margin-bottom: 10px;
+  }
   .stats { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
   .hint { font-size: 12px; color: var(--muted); margin: 4px 0; min-height: 16px; }
   .hint.error { color: var(--danger); }
@@ -180,32 +183,38 @@
 <header>
   <h1>Keygraph.js</h1>
   <div class="toolbar">
-    <input type="text" id="graphName" placeholder="Graph name (saved in JSON)" />
-    <input type="number" id="nodeCount" min="1" max="64" value="8" title="Node count for a new complete graph" />
-    <button id="btnNew" title="Create a complete graph with the given node count">New complete graph</button>
-    <button id="btnAddNode" title="Add a single node">Add node</button>
-    <button id="btnSample" title="Example: communities A/B + hubs, README weights">Load sample</button>
-    <button id="btnLoad">Load file…</button>
-    <button id="btnSave">Save file…</button>
-    <div class="export-wrap" id="exportWrap">
-      <button id="btnExport" title="Export the graph in a standard graph format">Export…</button>
-      <div class="export-menu" id="exportMenu" hidden>
-        <button type="button" data-format="gml">GML (.gml)</button>
-        <button type="button" data-format="graphml">GraphML (.graphml)</button>
-        <button type="button" data-format="dot">DOT (.dot)</button>
+    <div class="toolbar-group">
+      <button id="btnLoad">Load file…</button>
+      <button id="btnSave">Save file…</button>
+      <div class="export-wrap" id="exportWrap">
+        <button id="btnExport" title="Export the graph in a standard graph format">Export…</button>
+        <div class="export-menu" id="exportMenu" hidden>
+          <button type="button" data-format="gml">GML (.gml)</button>
+          <button type="button" data-format="graphml">GraphML (.graphml)</button>
+          <button type="button" data-format="dot">DOT (.dot)</button>
+        </div>
       </div>
     </div>
-    <button id="btnConnect" title="Click two nodes to add an edge between them">Connect nodes</button>
-    <button id="btnDeleteEdge" title="Remove the currently selected edge">Delete selected edge</button>
-    <button id="btnEdgeLabels" title="Show the weight next to each edge in the graph view">Edge labels: off</button>
-    <button id="btnAutoLayout" title="Run the force layout once, then freeze it">Auto-layout</button>
-    <button id="btnUndoLayout" title="Restore the positions from before the last auto-layout" disabled>Undo layout</button>
+    <div class="toolbar-group">
+      <button id="btnNew" title="Create a complete graph with the given node count">New complete graph</button>
+      <input type="number" id="nodeCount" min="1" max="64" value="8" title="Node count for a new complete graph" />
+      <button id="btnAddNode" title="Add a single node">Add node</button>
+      <button id="btnConnect" title="Click two nodes to add an edge between them">Connect nodes</button>
+      <button id="btnDeleteEdge" title="Remove the currently selected edge">Delete selected edge</button>
+    </div>
+    <div class="toolbar-group">
+      <button id="btnAutoLayout" title="Run the force layout once, then freeze it">Auto-layout</button>
+      <button id="btnUndoLayout" title="Restore the positions from before the last auto-layout" disabled>Undo layout</button>
+      <button id="btnEdgeLabels" title="Show the weight next to each edge in the graph view">Edge labels: off</button>
+    </div>
   </div>
 </header>
 <main>
   <div id="network"></div>
   <div id="resizer" title="Drag to resize the sidebar"></div>
   <div id="sidebar">
+    <h2>Graph</h2>
+    <input type="text" id="graphName" class="graph-name-input" placeholder="Graph name (saved in JSON)" />
     <div class="stats" id="stats"></div>
     <div class="hint" id="message">Click two nodes with "Connect nodes" to add an edge. Click an edge to jump to it in the list. Drag nodes to arrange.</div>
     <h2>Nodes — name &amp; group</h2>

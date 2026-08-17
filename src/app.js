@@ -1184,11 +1184,6 @@
       setMessage('New complete graph (' + n + ' nodes, ' + (n * (n - 1) / 2) + ' edges).');
     });
     document.getElementById('btnAddNode').addEventListener('click', addNode);
-    document.getElementById('btnSample').addEventListener('click', function () {
-      graph = sampleGraph();
-      rebuild();
-      setMessage('Loaded sample graph (communities A/B + hubs).');
-    });
     document.getElementById('btnLoad').addEventListener('click', function () {
       document.getElementById('fileInput').click();
     });
