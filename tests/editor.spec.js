@@ -148,9 +148,11 @@ test('bulk-selects edges and sets a shared weight', async ({ page }) => {
 });
 
 test('renaming a group changes the node color', async ({ page }) => {
-  const swatch = page.locator('#nodeList .node-row .swatch').first();
+  const row = page.locator('#nodeList .node-row').first();
+  await row.locator('.node-edit').click(); // open the name/group editor
+  const swatch = row.locator('.swatch');
   const before = await swatch.evaluate((el) => el.style.background);
-  await page.locator('#nodeList .node-row input.group-input').first().fill('renamed');
+  await row.locator('.node-edit-line input.group-input').fill('renamed');
   const after = await swatch.evaluate((el) => el.style.background);
   expect(after).not.toBe(before);
 });
@@ -166,6 +168,45 @@ test('clicking a node highlights all its incident edges', async ({ page }) => {
   await page.mouse.click(p.nodes.C1.x, p.nodes.C1.y);
   await page.waitForTimeout(300);
   await expect(page.locator('#edgeList .edge-row.selected')).toHaveCount(7);
+});
+
+test('clicking a node highlights it in the vertex list', async ({ page }) => {
+  const p = await graphPoints(page);
+  await page.mouse.click(p.nodes.C1.x, p.nodes.C1.y);
+  await page.waitForTimeout(300);
+  await expect(page.locator('#nodeList .node-row.selected')).toHaveCount(1);
+  await expect(page.locator('#nodeList .node-row[data-id="C1"]')).toHaveClass(/selected/);
+});
+
+test('clicking empty canvas clears the vertex list highlight', async ({ page }) => {
+  const p = await graphPoints(page);
+  await page.mouse.click(p.nodes.C1.x, p.nodes.C1.y);
+  await page.waitForTimeout(300);
+  await expect(page.locator('#nodeList .node-row.selected')).toHaveCount(1);
+
+  // click the canvas corner farthest from every node
+  const far = await page.evaluate(() => {
+    const n = window.__graphEditor;
+    const P = n.getPositions();
+    const c = document.getElementById('network').getBoundingClientRect();
+    const corners = [
+      [c.x + 8, c.y + 8], [c.x + c.width - 8, c.y + 8],
+      [c.x + 8, c.y + c.height - 8], [c.x + c.width - 8, c.y + c.height - 8],
+    ];
+    let best = corners[0], bestD = -1;
+    for (const [cx, cy] of corners) {
+      let minD = Infinity;
+      for (const id of Object.keys(P)) {
+        const vp = n.canvasToDOM(P[id]);
+        minD = Math.min(minD, Math.hypot(cx - (c.x + vp.x), cy - (c.y + vp.y)));
+      }
+      if (minD > bestD) { bestD = minD; best = [cx, cy]; }
+    }
+    return { x: best[0], y: best[1] };
+  });
+  await page.mouse.click(far.x, far.y);
+  await page.waitForTimeout(300);
+  await expect(page.locator('#nodeList .node-row.selected')).toHaveCount(0);
 });
 
 test('clicking an edge highlights exactly that edge', async ({ page }) => {
@@ -239,8 +280,9 @@ test('select-all checkbox selects every edge', async ({ page }) => {
 });
 
 test('renaming a node updates edge labels', async ({ page }) => {
-  await page.locator('#nodeList .node-row').first()
-    .locator('input[type="text"]:not([list])').fill('crown');
+  const row = page.locator('#nodeList .node-row').first();
+  await row.locator('.node-edit').click(); // open the name/group editor
+  await row.locator('.node-edit-line input[type="text"]:not([list])').fill('crown');
   await expect(page.locator('#edgeList .edge-row').first().locator('.edge-label'))
     .toHaveText('crown — C2');
 });
@@ -310,6 +352,19 @@ test('editing a node weight updates its value and draw size', async ({ page }) =
   await expect(row.locator('.node-val')).toHaveText('0.77');
   const size = await page.evaluate(() => window.__graphEditor.body.data.nodes.get('C1').size);
   expect(size).toBeCloseTo(12 + 22 * 0.77, 2);
+});
+
+test('the sidebar can be resized with the drag handle', async ({ page }) => {
+  const before = await page.locator('#sidebar').boundingBox();
+  const handle = await page.locator('#resizer').boundingBox();
+  const cx = handle.x + handle.width / 2;
+  const cy = handle.y + handle.height / 2;
+  await page.mouse.move(cx, cy);
+  await page.mouse.down();
+  await page.mouse.move(cx - 90, cy, { steps: 6 });
+  await page.mouse.up();
+  const after = await page.locator('#sidebar').boundingBox();
+  expect(after.width).toBeGreaterThan(before.width + 50);
 });
 
 test('loads a graph file', async ({ page }) => {

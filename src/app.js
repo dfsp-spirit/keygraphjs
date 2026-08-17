@@ -42,6 +42,7 @@
   var connectSource = null;
   var showEdgeLabels = false;
   var highlightedEdgeKeys = new Set();  // vis edge ids ('source__target') highlighted in the list
+  var highlightedNodeKeys = new Set();  // vis node ids highlighted in the node list
   var layoutSnapshot = null;  // {id, x, y}[] captured before auto-layout
   var bulkSelected = new Set();  // edge objects selected for bulk edit
 
@@ -382,6 +383,7 @@
     network.body.data.nodes.remove([id]);
     if (removedIds.length) network.body.data.edges.remove(removedIds);
     removedIds.forEach(function (k) { highlightedEdgeKeys.delete(k); });
+    highlightedNodeKeys.delete(id);
     renderNodeList();
     renderEdgeList();
     renderStats();
@@ -426,6 +428,11 @@
     graph.nodes.forEach(function (n) {
       var row = document.createElement('div');
       row.className = 'node-row';
+      row.setAttribute('data-id', n.id);
+
+      // line 1: id, color, name (read-only), group chip, edit, delete
+      var mainLine = document.createElement('div');
+      mainLine.className = 'node-main-line';
 
       var idSpan = document.createElement('span');
       idSpan.className = 'node-id';
@@ -435,38 +442,22 @@
       swatch.className = 'swatch';
       swatch.style.background = groupColor(n.group);
 
-      var labelInput = document.createElement('input');
-      labelInput.type = 'text';
-      labelInput.value = n.label || '';
-      labelInput.placeholder = 'name';
-      labelInput.title = 'Human-readable name (optional).';
-      labelInput.addEventListener('input', function () {
-        n.label = labelInput.value;
-        network.body.data.nodes.update({ id: n.id, label: labelInput.value || n.id });
-        renderEdgeList(); // edge labels use node names
-      });
+      var nameSpan = document.createElement('span');
+      nameSpan.className = 'node-name';
+      nameSpan.textContent = n.label || n.id;
+      nameSpan.title = (n.label || n.id) + (n.group ? ' \u00b7 ' + n.group : '');
 
-      var groupInput = document.createElement('input');
-      groupInput.type = 'text';
-      groupInput.className = 'group-input';
-      groupInput.setAttribute('list', 'groupOptions');
-      groupInput.value = n.group || '';
-      groupInput.placeholder = 'group';
-      groupInput.title = 'Group metadata (optional). Type a name or pick one.';
-      var applyGroup = function () {
-        n.group = groupInput.value.trim();
-        swatch.style.background = groupColor(n.group);
-        network.body.data.nodes.update(visNodeObject(n));
-      };
-      groupInput.addEventListener('input', applyGroup);
-      groupInput.addEventListener('change', function () {
-        applyGroup();
-        renderGroupDatalist(); // new names become suggestions
-      });
-      groupInput.addEventListener('blur', function () {
-        applyGroup();
-        renderGroupDatalist(); // ensure datalist reflects the committed name
-      });
+      var chip = document.createElement('span');
+      chip.className = 'node-chip';
+      chip.textContent = n.group || '';
+      chip.title = 'Group';
+      chip.style.background = groupColor(n.group);
+      chip.style.display = n.group ? '' : 'none';
+
+      var editBtn = document.createElement('button');
+      editBtn.className = 'node-edit';
+      editBtn.textContent = '\u270e'; // pencil
+      editBtn.title = 'Edit name / group';
 
       var del = document.createElement('button');
       del.className = 'edge-del';
@@ -474,7 +465,7 @@
       del.title = 'Remove this node (and its edges)';
       del.addEventListener('click', function () { deleteNode(n.id); });
 
-      // second line: vertex weight slider (mirrors the edge rows)
+      // line 2: vertex weight slider (mirrors the edge rows)
       var weightLine = document.createElement('div');
       weightLine.className = 'node-weight-line';
 
@@ -504,14 +495,74 @@
       weightLine.appendChild(weightSlider);
       weightLine.appendChild(weightVal);
 
-      row.appendChild(idSpan);
-      row.appendChild(swatch);
-      row.appendChild(labelInput);
-      row.appendChild(groupInput);
-      row.appendChild(del);
+      // line 3 (hidden): name + group editing — rare, so tucked away
+      var editLine = document.createElement('div');
+      editLine.className = 'node-edit-line';
+      editLine.hidden = true;
+
+      var labelInput = document.createElement('input');
+      labelInput.type = 'text';
+      labelInput.value = n.label || '';
+      labelInput.placeholder = 'name';
+      labelInput.title = 'Human-readable name (optional).';
+      labelInput.addEventListener('input', function () {
+        n.label = labelInput.value;
+        nameSpan.textContent = labelInput.value || n.id;
+        nameSpan.title = (labelInput.value || n.id) + (n.group ? ' \u00b7 ' + n.group : '');
+        network.body.data.nodes.update({ id: n.id, label: labelInput.value || n.id });
+        renderEdgeList(); // edge labels use node names
+      });
+
+      var groupInput = document.createElement('input');
+      groupInput.type = 'text';
+      groupInput.className = 'group-input';
+      groupInput.setAttribute('list', 'groupOptions');
+      groupInput.value = n.group || '';
+      groupInput.placeholder = 'group';
+      groupInput.title = 'Group metadata (optional). Type a name or pick one.';
+      var applyGroup = function () {
+        n.group = groupInput.value.trim();
+        swatch.style.background = groupColor(n.group);
+        chip.textContent = n.group;
+        chip.style.background = groupColor(n.group);
+        chip.style.display = n.group ? '' : 'none';
+        network.body.data.nodes.update(visNodeObject(n));
+      };
+      groupInput.addEventListener('input', applyGroup);
+      groupInput.addEventListener('change', function () {
+        applyGroup();
+        renderGroupDatalist(); // new names become suggestions
+      });
+      groupInput.addEventListener('blur', function () {
+        applyGroup();
+        renderGroupDatalist(); // ensure datalist reflects the committed name
+      });
+
+      editBtn.addEventListener('click', function () {
+        editLine.hidden = !editLine.hidden;
+        if (!editLine.hidden) {
+          labelInput.focus();
+          labelInput.select();
+        }
+      });
+
+      editLine.appendChild(labelInput);
+      editLine.appendChild(groupInput);
+
+      mainLine.appendChild(idSpan);
+      mainLine.appendChild(swatch);
+      mainLine.appendChild(nameSpan);
+      mainLine.appendChild(chip);
+      mainLine.appendChild(editBtn);
+      mainLine.appendChild(del);
+
+      row.appendChild(mainLine);
       row.appendChild(weightLine);
+      row.appendChild(editLine);
       el.appendChild(row);
     });
+
+    applyNodeHighlight();
   }
 
   function renderEdgeList() {
@@ -845,6 +896,8 @@
     if (network) network.destroy();
     layoutSnapshot = null;
     bulkSelected.clear();
+    highlightedEdgeKeys = new Set();
+    highlightedNodeKeys = new Set();
     document.getElementById('graphName').value = graph.meta.name || '';
     buildNetwork();
     renderNodeList();
@@ -874,6 +927,21 @@
     }
   }
 
+  function getNodeRow(id) {
+    var rows = document.querySelectorAll('#nodeList .node-row');
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i].getAttribute('data-id') === id) return rows[i];
+    }
+    return null;
+  }
+
+  function applyNodeHighlight() {
+    var rows = document.querySelectorAll('#nodeList .node-row');
+    for (var i = 0; i < rows.length; i++) {
+      rows[i].classList.toggle('selected', highlightedNodeKeys.has(rows[i].getAttribute('data-id')));
+    }
+  }
+
   function highlightEdgeRows(keys) {
     highlightedEdgeKeys = new Set(keys || []);
     applyEdgeHighlight();
@@ -889,6 +957,16 @@
     }
   }
 
+  function highlightNodeRows(keys) {
+    highlightedNodeKeys = new Set(keys || []);
+    applyNodeHighlight();
+    // Scroll a single selected node into view (node click).
+    if (highlightedNodeKeys.size === 1) {
+      var row = getNodeRow(Array.from(highlightedNodeKeys)[0]);
+      if (row) row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  }
+
   // Re-sync the list highlight from the current vis-network selection. Called on
   // every selection event so the list always matches the view. Deferred to the
   // next tick because, when clicking an edge that was already selected as part
@@ -899,6 +977,7 @@
     setTimeout(function () {
       if (!network) return;
       highlightEdgeRows(network.getSelectedEdges());
+      highlightNodeRows(network.getSelectedNodes());
     }, 0);
   }
 
@@ -959,9 +1038,39 @@
     if (undo) undo.disabled = !layoutSnapshot;
   }
 
+  // Draggable handle between the canvas and the sidebar lets the user resize
+  // the right-hand panel (clamped to a sensible range).
+  function initResizer() {
+    var resizer = document.getElementById('resizer');
+    var sidebar = document.getElementById('sidebar');
+    var startX = 0;
+    var startW = 0;
+    resizer.addEventListener('pointerdown', function (evt) {
+      startX = evt.clientX;
+      startW = sidebar.getBoundingClientRect().width;
+      resizer.setPointerCapture(evt.pointerId);
+      document.body.classList.add('resizing');
+      evt.preventDefault();
+    });
+    resizer.addEventListener('pointermove', function (evt) {
+      if (evt.buttons !== 1) return;
+      var w = startW + (startX - evt.clientX);
+      w = Math.max(260, Math.min(600, w));
+      sidebar.style.flexBasis = w + 'px';
+      sidebar.style.width = w + 'px';
+    });
+    resizer.addEventListener('pointerup', function () {
+      document.body.classList.remove('resizing');
+    });
+    resizer.addEventListener('pointercancel', function () {
+      document.body.classList.remove('resizing');
+    });
+  }
+
   function init() {
     graph = sampleGraph();
     rebuild();
+    initResizer();
 
     document.getElementById('btnNew').addEventListener('click', function () {
       var n = parseInt(document.getElementById('nodeCount').value, 10);
