@@ -440,6 +440,7 @@
     graph.nodes.forEach(function (n) {
       if (pos[n.id]) { n.x = pos[n.id].x; n.y = pos[n.id].y; }
     });
+    autosave(); // drags and auto-layout change positions
   }
 
   // ---------------------------------------------------------------- edge ops
@@ -595,6 +596,8 @@
     // Accessible description of the canvas graph, kept in sync with the stats.
     document.getElementById('network').setAttribute('aria-label',
       n + ' nodes, ' + graph.edges.length + ' edges, ' + (graph.directed ? 'directed' : 'undirected') + ' graph');
+    // Structural changes go through here (add/remove, new/load, mode switch).
+    autosave();
   }
 
   function collectGroups() {
@@ -689,6 +692,7 @@
         n.weight = Number(weightSlider.value);
         weightVal.textContent = n.weight.toFixed(2);
         network.body.data.nodes.update(visNodeObject(n));
+        autosave();
       });
 
       weightLine.appendChild(weightLabel);
@@ -712,6 +716,7 @@
         nameSpan.title = (labelInput.value || n.id) + (n.group ? ' \u00b7 ' + n.group : '');
         network.body.data.nodes.update({ id: n.id, label: labelInput.value || n.id });
         renderEdgeList(); // edge labels use node names
+        autosave();
       });
 
       var groupInput = document.createElement('input');
@@ -729,6 +734,7 @@
         chip.style.background = groupColor(n.group);
         chip.style.display = n.group ? '' : 'none';
         network.body.data.nodes.update(visNodeObject(n));
+        autosave();
       };
       groupInput.addEventListener('input', applyGroup);
       groupInput.addEventListener('change', function () {
@@ -821,6 +827,7 @@
         e.weight = Number(slider.value);
         val.textContent = e.weight.toFixed(2);
         network.body.data.edges.update(edgeVisObject(e));
+        autosave();
       });
 
       var del = document.createElement('button');
@@ -884,6 +891,7 @@
       }
     });
     document.getElementById('bulkVal').textContent = Number(value).toFixed(2);
+    autosave();
   }
 
   function clearBulkSelection() {
@@ -917,6 +925,44 @@
     syncPositions();
     downloadText(baseFilename() + '.json', JSON.stringify(graph, null, 2), 'application/json');
     setMessage('Saved JSON (' + graph.nodes.length + ' nodes, ' + graph.edges.length + ' edges).');
+  }
+
+  // ----------------------------------------------------------- autosave
+
+  // Best-effort autosave of the whole graph (including layout positions and the
+  // directed mode) so a refresh, tab close or crash silently restores the last
+  // state. localStorage first, sessionStorage as a fallback (some file:// or
+  // private-mode setups block localStorage). Debounced: sliders and typing fire
+  // many events, so we only write the settled state.
+  var DRAFT_KEY = 'keygraphjs:draft';
+  var autosaveTimer = null;
+
+  function autosave() {
+    if (autosaveTimer) clearTimeout(autosaveTimer);
+    autosaveTimer = setTimeout(function () {
+      autosaveTimer = null;
+      var text;
+      try { text = JSON.stringify(graph); } catch (err) { return; }
+      try {
+        localStorage.setItem(DRAFT_KEY, text);
+      } catch (err) {
+        try { sessionStorage.setItem(DRAFT_KEY, text); } catch (err2) { /* no storage available */ }
+      }
+    }, 500);
+  }
+
+  // The saved draft, or null if there is none (or storage is unavailable).
+  function loadDraft() {
+    try {
+      var raw = localStorage.getItem(DRAFT_KEY);
+      if (raw === null || raw === undefined) raw = sessionStorage.getItem(DRAFT_KEY);
+      if (!raw) return null;
+      var parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed.nodes) || !Array.isArray(parsed.edges)) return null;
+      return parsed;
+    } catch (err) {
+      return null;
+    }
   }
 
   // ------------------------------------------------------------------- import
@@ -1550,6 +1596,7 @@
     layoutSnapshot = null;
     network.body.data.nodes.update(graph.nodes.map(visNodeObject));
     updateLayoutButtons();
+    autosave(); // positions changed
     setMessage('Layout restored.');
   }
 
@@ -1588,7 +1635,9 @@
   }
 
   function init() {
-    graph = sampleGraph();
+    // Silently pick up the last autosaved draft (if any) instead of the sample.
+    var draft = loadDraft();
+    graph = draft ? normalize(draft) : sampleGraph();
     rebuild();
     initResizer();
 
@@ -1671,6 +1720,7 @@
     });
     document.getElementById('graphName').addEventListener('input', function (evt) {
       graph.meta.name = evt.target.value;
+      autosave();
     });
   }
 

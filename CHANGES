@@ -26,6 +26,10 @@ New feature: support for **directed graphs** (in addition to undirected ones).
   buttons and checkboxes; the status message is a live region (polite, assertive
   for errors); the graph canvas has an accessible label synced with the stats;
   the Export…/Add node dropdown buttons expose `aria-expanded`
+- autosave: the current graph (nodes, edges, weights, layout positions, mode) is
+  silently saved to localStorage (debounced 500 ms) and restored on the next
+  visit — a refresh, tab close or crash no longer loses work; falls back to
+  sessionStorage when localStorage is unavailable
 
 ### v0.1.0 -- Initial release
 

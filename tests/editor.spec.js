@@ -1090,3 +1090,55 @@ test.describe('mode switching', () => {
     await expect(page.locator('#stats')).toContainText('12 edges'); // complete directed 4*3
   });
 });
+
+// ---------------------------------------------------------------------------
+// Autosave: the draft is written to localStorage and silently restored.
+// ---------------------------------------------------------------------------
+
+test('autosaves the draft to localStorage and silently restores it after reload', async ({ page }) => {
+  // Edit the graph: add an isolated node.
+  await page.click('#btnAddNode');
+  await page.locator('#addNodeMenu button[data-mode="isolated"]').click();
+  await expect(page.locator('#nodeList .node-row')).toHaveCount(9);
+
+  await page.waitForTimeout(700); // let the debounced (500 ms) autosave fire
+  const draft = await page.evaluate(() => JSON.parse(localStorage.getItem('keygraphjs:draft') || 'null'));
+  expect(draft).not.toBeNull();
+  expect(draft.nodes).toHaveLength(9);
+
+  // Refresh: the edited graph must come back silently (no sample graph).
+  await page.reload();
+  await settle(page);
+  await expect(page.locator('#nodeList .node-row')).toHaveCount(9);
+  await expect(page.locator('#stats')).toContainText('9 nodes');
+});
+
+test('a loaded file is autosaved and restored on reload', async ({ page }) => {
+  const [chooser] = await Promise.all([
+    page.waitForEvent('filechooser'),
+    page.click('#btnLoad'),
+  ]);
+  await chooser.setFiles(path.join(__dirname, 'fixtures', 'small_graph.json'));
+  await settle(page);
+  await expect(page.locator('#nodeList .node-row')).toHaveCount(3);
+
+  await page.waitForTimeout(700);
+  await page.reload();
+  await settle(page);
+  // The loaded graph, not the sample, is restored.
+  await expect(page.locator('#nodeList .node-row')).toHaveCount(3);
+  await expect(page.locator('#edgeList .edge-row')).toHaveCount(3);
+});
+
+test('directed mode is preserved in the autosaved draft', async ({ page }) => {
+  page.on('dialog', (d) => d.accept());
+  await page.click('#btnMode'); // -> directed
+  await settle(page);
+  await expect(page.locator('#btnMode')).toHaveText('Mode: directed');
+
+  await page.waitForTimeout(700);
+  await page.reload();
+  await settle(page);
+  await expect(page.locator('#btnMode')).toHaveText('Mode: directed');
+  await expect(page.locator('#edgeList .edge-row')).toHaveCount(56);
+});
