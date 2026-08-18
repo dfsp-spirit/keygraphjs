@@ -1,7 +1,12 @@
 ## keygraphjs Changelog
 
 
-### Current WIP
+Current WIP
+-----------
+
+
+v0.2.0 -- Directed graph support
+----------------------------------
 
 New feature: support for **directed graphs** (in addition to undirected ones).
 
@@ -37,7 +42,8 @@ New feature: support for **directed graphs** (in addition to undirected ones).
   asymmetric with nodes, and could delete all incident edges when a node was
   selected, since clicking a node selects its edges)
 
-### v0.1.0 -- Initial release
+v0.1.0 -- Initial release
+--------------------------
 
 Most relevant features:
 

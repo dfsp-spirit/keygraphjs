@@ -1,6 +1,6 @@
 {
   "name": "keygraphjs",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "A small, dependency-free web editor for undirected, edge-weighted graphs.",
   "scripts": {

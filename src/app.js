@@ -20,7 +20,7 @@
   'use strict';
 
   // App version — keep in sync with the "version" field in package.json.
-  var APP_VERSION = '0.1.0';
+  var APP_VERSION = '0.2.0';
 
   var NUM_NODES = 8;
   var DEFAULT_WEIGHT = 0.10;
