@@ -398,13 +398,6 @@ test('connects two nodes to add an edge', async ({ page }) => {
   await expect(page.locator('#edgeList .edge-row')).toHaveCount(29);
 });
 
-test('deletes the selected edge from the canvas', async ({ page }) => {
-  await clickEdge(page, 'C3', 'C4');
-  await page.click('#btnDeleteEdge');
-  await page.waitForTimeout(200);
-  await expect(page.locator('#edgeList .edge-row')).toHaveCount(27);
-});
-
 test('auto-layout enables undo, undo restores', async ({ page }) => {
   await expect(page.locator('#btnUndoLayout')).toBeDisabled();
   await page.click('#btnAutoLayout');
@@ -942,14 +935,6 @@ for (const mode of ['undirected', 'directed']) {
       await expect(page.locator('#bulkCount')).toHaveText(START_EDGES + ' selected');
       await page.click('#btnBulkClear');
       await expect(page.locator('#bulkBar')).toBeHidden();
-    });
-
-    test('deletes the selected edge from the canvas', async ({ page }) => {
-      await clickEdge(page, 'C3', 'C4');
-      await page.click('#btnDeleteEdge');
-      await page.waitForTimeout(200);
-      const removed = isDirected ? 2 : 1; // a collapsed pair removes both directions
-      await expect(page.locator('#edgeList .edge-row')).toHaveCount(START_EDGES - removed);
     });
 
     test('clicking a node highlights its incident edges', async ({ page }) => {

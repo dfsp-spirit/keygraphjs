@@ -487,21 +487,6 @@
     setMessage('Removed edge ' + edgeLabel(source, target) + '.');
   }
 
-  function deleteSelectedEdges() {
-    var sel = network.getSelectedEdges();
-    if (sel.length === 0) { setMessage('No edge selected (click an edge first).', true); return; }
-    var removed = graph.edges.filter(function (e) {
-      return sel.some(function (k) { return matchesVisKey(e, k); });
-    });
-    if (removed.length === 0) return;
-    graph.edges = graph.edges.filter(function (e) { return removed.indexOf(e) < 0; });
-    removed.forEach(function (e) { bulkSelected.delete(e); });
-    network.body.data.edges.remove(sel);
-    renderEdgeList();
-    renderStats();
-    setMessage('Deleted ' + removed.length + ' edge(s).');
-  }
-
   // Delete every direction of the given vis edge key (used by the context
   // menu: a collapsed bidirectional pair deletes both directions).
   function deleteEdgesForVisKey(key) {
@@ -1715,7 +1700,6 @@
     });
     document.getElementById('btnConnect').addEventListener('click', toggleConnect);
     document.getElementById('btnMode').addEventListener('click', toggleMode);
-    document.getElementById('btnDeleteEdge').addEventListener('click', deleteSelectedEdges);
     document.getElementById('btnAutoLayout').addEventListener('click', runAutoLayout);
     document.getElementById('btnUndoLayout').addEventListener('click', undoLayout);
     document.getElementById('btnEdgeLabels').addEventListener('click', toggleEdgeLabels);

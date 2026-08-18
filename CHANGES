@@ -32,6 +32,10 @@ New feature: support for **directed graphs** (in addition to undirected ones).
   sessionStorage when localStorage is unavailable
 - new "Vertex weights" toggle (View toolbar): shows each node's weight value
   below its name on the canvas, mirroring the existing edge-label toggle
+- removed the "Delete selected edge" toolbar button — deleting an edge is done
+  via the right-click context menu or the sidebar ✕ (the button was redundant,
+  asymmetric with nodes, and could delete all incident edges when a node was
+  selected, since clicking a node selects its edges)
 
 ### v0.1.0 -- Initial release
 
