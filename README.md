@@ -3,7 +3,7 @@
 [![Tests](https://github.com/dfsp-spirit/keygraphjs/actions/workflows/e2e.yml/badge.svg)](https://github.com/dfsp-spirit/keygraphjs/actions/workflows/e2e.yml)
 
 A small, dependency-free web editor for **undirected and directed, edge-weighted graphs**. It runs
-entirely in the browser — no server, no build step — and reads/writes a simple JSON format.
+entirely in the browser — no server, no build step — and reads/writes a simple JSON format and standard graph file formats.
 
 
 
