@@ -368,6 +368,24 @@
     setMessage('Added node ' + id + '.');
   }
 
+  function addFullyConnectedNode() {
+    var id = nextNodeId();
+    var pos = centroidPosition();
+    var n = { id: id, label: id, group: '', weight: DEFAULT_WEIGHT, x: pos.x, y: pos.y };
+    graph.nodes.push(n);
+    network.body.data.nodes.add(visNodeObject(n));
+    graph.nodes.forEach(function (m) {
+      if (m.id === id) return;
+      var e = { source: id, target: m.id, weight: DEFAULT_WEIGHT };
+      graph.edges.push(e);
+      network.body.data.edges.add(edgeVisObject(e));
+    });
+    renderNodeList();
+    renderEdgeList();
+    renderStats();
+    setMessage('Added node ' + id + ' connected to all other nodes.');
+  }
+
   function deleteNode(id) {
     if (graph.nodes.length <= 1) {
       setMessage('Cannot remove the last node.', true);
@@ -1066,6 +1084,17 @@
     document.getElementById('exportMenu').hidden = true;
   }
 
+  function toggleAddNodeMenu() {
+    var menu = document.getElementById('addNodeMenu');
+    var wasHidden = menu.hidden;
+    menu.hidden = true;
+    if (wasHidden) menu.hidden = false;
+  }
+
+  function closeAddNodeMenu() {
+    document.getElementById('addNodeMenu').hidden = true;
+  }
+
   // ---------------------------------------------------------- context menu
 
   function findEdgeByVisKey(key) {
@@ -1359,7 +1388,21 @@
       rebuild();
       setMessage('New complete graph (' + n + ' nodes, ' + (n * (n - 1) / 2) + ' edges).');
     });
-    document.getElementById('btnAddNode').addEventListener('click', addNode);
+    document.getElementById('btnAddNode').addEventListener('click', toggleAddNodeMenu);
+    var addNodeBtns = document.querySelectorAll('#addNodeMenu button');
+    for (var i = 0; i < addNodeBtns.length; i++) {
+      (function (btn) {
+        btn.addEventListener('click', function () {
+          if (btn.getAttribute('data-mode') === 'connected') addFullyConnectedNode();
+          else addNode();
+          closeAddNodeMenu();
+        });
+      })(addNodeBtns[i]);
+    }
+    document.addEventListener('click', function (evt) {
+      var wrap = document.getElementById('addNodeWrap');
+      if (wrap && !wrap.contains(evt.target)) closeAddNodeMenu();
+    });
     document.getElementById('btnLoad').addEventListener('click', function () {
       document.getElementById('fileInput').click();
     });

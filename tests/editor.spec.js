@@ -98,10 +98,21 @@ test('loads the sample graph: 8 nodes, 28 edges', async ({ page }) => {
   await expect(page.locator('#stats')).toContainText('28 edges');
 });
 
-test('adds a node', async ({ page }) => {
+test('adds an isolated node via the Add node menu', async ({ page }) => {
   await page.click('#btnAddNode');
+  await page.locator('#addNodeMenu button[data-mode="isolated"]').click();
   await expect(page.locator('#nodeList .node-row')).toHaveCount(9);
   await expect(page.locator('#stats')).toContainText('9 nodes');
+});
+
+test('adds a fully connected node via the Add node menu', async ({ page }) => {
+  await page.click('#btnAddNode');
+  await page.locator('#addNodeMenu button[data-mode="connected"]').click();
+  await expect(page.locator('#nodeList .node-row')).toHaveCount(9);
+  await expect(page.locator('#stats')).toContainText('9 nodes');
+  // New node C9 connects to all 8 existing nodes: 28 + 8 = 36 edges.
+  await expect(page.locator('#stats')).toContainText('36 edges');
+  await expect(page.locator('#edgeList .edge-row')).toHaveCount(36);
 });
 
 test('creates a new complete graph with N nodes', async ({ page }) => {
@@ -318,6 +329,7 @@ test('no console/page errors on load or during interactions', async ({ page }) =
   await page.click('#btnEdgeLabels');
   await page.click('#btnEdgeLabels');
   await page.click('#btnAddNode');
+  await page.locator('#addNodeMenu button[data-mode="isolated"]').click();
 
   expect(errors).toEqual([]);
 });
@@ -330,6 +342,7 @@ test('deletes an edge via its ✕ button', async ({ page }) => {
 
 test('connects two nodes to add an edge', async ({ page }) => {
   await page.click('#btnAddNode'); // C9, no edges yet
+  await page.locator('#addNodeMenu button[data-mode="isolated"]').click();
   // Park C9 at a clear on-screen spot: its default position (the graph
   // centroid + random offset) can land on top of another node, which would
   // make the connect click miss. Pick a corner far from every existing node.

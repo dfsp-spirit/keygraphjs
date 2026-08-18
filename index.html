@@ -82,6 +82,8 @@
     font-size: 13px;
   }
   .export-menu button:hover { background: #f1f5f9; }
+  /* Add-node submenu drops down left-aligned under its button. */
+  .addnode-menu { right: auto; left: 0; }
   #contextMenu {
     position: fixed;
     z-index: 50;
@@ -198,7 +200,13 @@
     <div class="toolbar-group">
       <button id="btnNew" title="Create a complete graph with the given node count">New complete graph</button>
       <input type="number" id="nodeCount" min="1" max="64" value="8" title="Node count for a new complete graph" />
-      <button id="btnAddNode" title="Add a single node">Add node</button>
+      <div class="export-wrap" id="addNodeWrap">
+        <button id="btnAddNode" title="Add a node (isolated or fully connected)">Add node</button>
+        <div class="export-menu addnode-menu" id="addNodeMenu" hidden>
+          <button type="button" data-mode="isolated">Isolated</button>
+          <button type="button" data-mode="connected">Fully connected</button>
+        </div>
+      </div>
       <button id="btnConnect" title="Click two nodes to add an edge between them">Connect nodes</button>
       <button id="btnDeleteEdge" title="Remove the currently selected edge">Delete selected edge</button>
     </div>
