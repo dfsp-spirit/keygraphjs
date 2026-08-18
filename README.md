@@ -7,7 +7,7 @@ entirely in the browser — no server, no build step — and reads/writes a simp
 
 
 
-![keygraphjs](https://github.com/dfsp-spirit/keygraphjs/blob/main/web/img/keygraphjs.png?raw=true "Screenshot of the keygraph.js user interface")
+![keygraphjs](https://github.com/dfsp-spirit/keygraphjs/blob/main/web/img/keygraphjs.png "Screenshot of the keygraph.js user interface")
 
 
 ## About
