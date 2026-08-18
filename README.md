@@ -93,11 +93,19 @@ npm test
 
 
 
-## Layout
+## Repo Layout
 
 - `index.html` — UI and styles
 - `src/app.js` — editor logic
 - `vendor/vis-network.min.js` — vendored vis-network (standalone build)
 - `examples/sample_graph.json` — an example graph
 - `tests/` — Playwright end-to-end tests
+
+
+## Author, Credits and License
+
+Written by [Tim Schäfer](https://ts.rcmd.org), licensed under [MIT license](./LICENSE).
+
+This app is built upon the great [vis-network](https://github.com/visjs/vis-network/) javascript package (also published under the MIT license).
+
 
