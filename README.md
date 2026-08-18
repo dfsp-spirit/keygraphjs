@@ -49,6 +49,9 @@ custom attribute.
 The editor has no build step and no runtime dependencies — it's plain HTML/CSS/JS with
 [vis-network](https://visjs.github.io/vis-network/) vendored under `vendor/`.
 
+
+### Running the tests
+
 The test suite uses [Playwright](https://playwright.dev/):
 
 ```bash
@@ -56,6 +59,18 @@ npm install
 npx playwright install chromium   # once — downloads the browser
 npm test
 ```
+
+### Making a release
+
+* Log recent changes in CHANGES file
+* Increase version in **both** in `src/app.js`, variable `APP_VERSION`, and in `package.json`
+* Make sure tests are green locally (see `Running the tests` above)
+* Push to github repo
+* Make sure tests are green on CI (see `Running the tests` above)
+* Run git tag to tag the release commit, push tags
+* Create a release on the github repo website based on the tag
+
+
 
 ## Layout
 
