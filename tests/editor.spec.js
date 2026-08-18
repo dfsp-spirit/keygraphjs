@@ -746,3 +746,347 @@ test('rejects a mixed GraphML file (per-edge override of edgedefault)', async ({
   // The previous graph is untouched.
   await expect(page.locator('#edgeList .edge-row')).toHaveCount(28);
 });
+
+// ---------------------------------------------------------------------------
+// Every core interaction, run separately in undirected AND directed mode.
+// ---------------------------------------------------------------------------
+
+// A viewport point that lies on the a–b edge (used for right-clicking edges).
+function edgePoint(page, a, b) {
+  return page.evaluate(([a, b]) => {
+    const n = window.__graphEditor;
+    const P = n.getPositions();
+    const c = document.getElementById('network').getBoundingClientRect();
+    const vp = (x, y) => { const d = n.canvasToDOM({ x, y }); return { x: d.x + c.x, y: d.y + c.y }; };
+    const rel = (x, y) => ({ x: x - c.x, y: y - c.y });
+    for (const t of [0.5, 0.4, 0.6, 0.3, 0.7, 0.45, 0.55]) {
+      const q = vp(P[a].x + (P[b].x - P[a].x) * t, P[a].y + (P[b].y - P[a].y) * t);
+      const r = rel(q.x, q.y);
+      if (!n.getNodeAt(r) && n.getEdgeAt(r)) return q;
+    }
+    return null;
+  }, [a, b]);
+}
+
+// A canvas corner as far away from every node as possible.
+function farCorner(page) {
+  return page.evaluate(() => {
+    const n = window.__graphEditor;
+    const P = n.getPositions();
+    const c = document.getElementById('network').getBoundingClientRect();
+    const corners = [
+      [c.x + 8, c.y + 8], [c.x + c.width - 8, c.y + 8],
+      [c.x + 8, c.y + c.height - 8], [c.x + c.width - 8, c.y + c.height - 8],
+    ];
+    let best = corners[0], bestD = -1;
+    for (const [cx, cy] of corners) {
+      let minD = Infinity;
+      for (const id of Object.keys(P)) {
+        const vp = n.canvasToDOM(P[id]);
+        minD = Math.min(minD, Math.hypot(cx - (c.x + vp.x), cy - (c.y + vp.y)));
+      }
+      if (minD > bestD) { bestD = minD; best = [cx, cy]; }
+    }
+    return { x: best[0], y: best[1] };
+  });
+}
+
+// Toggle the mode toggle (accepting the confirm) until the wanted mode is active.
+async function setMode(page, mode) {
+  const label = await page.locator('#btnMode').textContent();
+  const isDirected = label.includes('Mode: directed');
+  const wantDirected = mode === 'directed';
+  if (isDirected !== wantDirected) {
+    page.once('dialog', (d) => d.accept());
+    await page.click('#btnMode');
+    await settle(page);
+  }
+}
+
+for (const mode of ['undirected', 'directed']) {
+  const isDirected = mode === 'directed';
+  const START_EDGES = isDirected ? 56 : 28; // sample graph: 8 nodes
+
+  test.describe(`core interactions in ${mode} mode`, () => {
+    test.beforeEach(async ({ page }) => {
+      await setMode(page, mode);
+    });
+
+    test('adds an isolated node via the Add node menu', async ({ page }) => {
+      await page.click('#btnAddNode');
+      await page.locator('#addNodeMenu button[data-mode="isolated"]').click();
+      await expect(page.locator('#nodeList .node-row')).toHaveCount(9);
+      await expect(page.locator('#stats')).toContainText('9 nodes');
+    });
+
+    test('adds a fully connected node', async ({ page }) => {
+      await page.click('#btnAddNode');
+      await page.locator('#addNodeMenu button[data-mode="connected"]').click();
+      await expect(page.locator('#nodeList .node-row')).toHaveCount(9);
+      const added = isDirected ? 16 : 8;
+      await expect(page.locator('#edgeList .edge-row')).toHaveCount(START_EDGES + added);
+    });
+
+    test('connects two nodes to add an edge', async ({ page }) => {
+      await page.click('#btnAddNode');
+      await page.locator('#addNodeMenu button[data-mode="isolated"]').click();
+      // Park C9 in a clear corner so the connect clicks never land on a node.
+      await page.evaluate(() => {
+        const n = window.__graphEditor;
+        const P = n.getPositions();
+        const rect = document.getElementById('network').getBoundingClientRect();
+        const spots = [
+          [rect.width / 2, 30], [30, rect.height / 2],
+          [rect.width - 30, rect.height - 30], [rect.width / 2, rect.height - 30],
+        ];
+        let best = null, bestD = -1;
+        for (const [sx, sy] of spots) {
+          const cp = n.DOMtoCanvas({ x: sx, y: sy });
+          let minD = Infinity;
+          for (const id of Object.keys(P)) {
+            if (id === 'C9') continue;
+            minD = Math.min(minD, Math.hypot(cp.x - P[id].x, cp.y - P[id].y));
+          }
+          if (minD > bestD) { bestD = minD; best = cp; }
+        }
+        n.moveNode('C9', best.x, best.y);
+      });
+      const p = await graphPoints(page);
+      await page.click('#btnConnect');
+      await page.mouse.click(p.nodes.C9.x, p.nodes.C9.y);
+      await page.mouse.click(p.nodes.C1.x, p.nodes.C1.y);
+      await page.waitForTimeout(200);
+      await expect(page.locator('#edgeList .edge-row')).toHaveCount(START_EDGES + 1);
+    });
+
+    test('deletes an edge via its ✕ button in the sidebar', async ({ page }) => {
+      await page.locator('.edge-row[data-key="C1__C2"] .edge-del').click();
+      await expect(page.locator('#edgeList .edge-row')).toHaveCount(START_EDGES - 1);
+    });
+
+    test('deletes a node via its ✕ button in the sidebar', async ({ page }) => {
+      await page.locator('#nodeList .node-row .edge-del').last().click();
+      await expect(page.locator('#nodeList .node-row')).toHaveCount(7);
+      const removed = isDirected ? 14 : 7; // C8 has 7 pairs, doubled when directed
+      await expect(page.locator('#edgeList .edge-row')).toHaveCount(START_EDGES - removed);
+    });
+
+    test('edits a node name and group in the sidebar', async ({ page }) => {
+      const row = page.locator('#nodeList .node-row').first();
+      await row.locator('.node-edit').click();
+      const swatch = row.locator('.swatch');
+      const before = await swatch.evaluate((el) => el.style.background);
+      await row.locator('.node-edit-line input.group-input').fill('renamed');
+      const after = await swatch.evaluate((el) => el.style.background);
+      expect(after).not.toBe(before);
+      // renaming updates the edge-list labels (arrow in directed mode)
+      await row.locator('.node-edit-line input[type="text"]:not([list])').fill('crown');
+      const sep = isDirected ? ' → ' : ' — ';
+      await expect(page.locator('#edgeList .edge-row').first().locator('.edge-label'))
+        .toHaveText('crown' + sep + 'C2');
+    });
+
+    test('edits a node weight via the sidebar slider', async ({ page }) => {
+      const row = page.locator('#nodeList .node-row').first();
+      await row.locator('input[type="range"]').evaluate((el, v) => {
+        el.value = v;
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+      }, '0.77');
+      await expect(row.locator('.node-val')).toHaveText('0.77');
+      const size = await page.evaluate(() => window.__graphEditor.body.data.nodes.get('C1').size);
+      expect(size).toBeCloseTo(12 + 22 * 0.77, 2);
+    });
+
+    test('edits an edge weight via the sidebar slider', async ({ page }) => {
+      const row = page.locator('.edge-row[data-key="C1__C2"]');
+      await row.locator('input[type="range"]').evaluate((el, v) => {
+        el.value = v;
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+      }, '0.42');
+      await expect(row.locator('.edge-val')).toHaveText('0.42');
+    });
+
+    test('bulk-selects edges and sets a shared weight', async ({ page }) => {
+      const boxes = page.locator('#edgeList .edge-row input[type="checkbox"]');
+      await boxes.nth(0).check();
+      await boxes.nth(1).check();
+      await expect(page.locator('#bulkBar')).toBeVisible();
+      await expect(page.locator('#bulkCount')).toHaveText('2 selected');
+      await page.locator('#bulkSlider').evaluate((el, v) => {
+        el.value = v;
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+      }, '0.42');
+      const vals = await page.locator('#edgeList .edge-row .edge-val').allTextContents();
+      expect(vals[0]).toBe('0.42');
+      expect(vals[1]).toBe('0.42');
+      await page.click('#btnBulkClear');
+      await expect(page.locator('#bulkBar')).toBeHidden();
+    });
+
+    test('select-all checkbox selects every edge', async ({ page }) => {
+      await page.check('#selectAllEdges');
+      await expect(page.locator('#bulkCount')).toHaveText(START_EDGES + ' selected');
+      await page.click('#btnBulkClear');
+      await expect(page.locator('#bulkBar')).toBeHidden();
+    });
+
+    test('deletes the selected edge from the canvas', async ({ page }) => {
+      await clickEdge(page, 'C3', 'C4');
+      await page.click('#btnDeleteEdge');
+      await page.waitForTimeout(200);
+      const removed = isDirected ? 2 : 1; // a collapsed pair removes both directions
+      await expect(page.locator('#edgeList .edge-row')).toHaveCount(START_EDGES - removed);
+    });
+
+    test('clicking a node highlights its incident edges', async ({ page }) => {
+      const p = await graphPoints(page);
+      await page.mouse.click(p.nodes.C1.x, p.nodes.C1.y);
+      await page.waitForTimeout(300);
+      const incident = isDirected ? 14 : 7;
+      await expect(page.locator('#edgeList .edge-row.selected')).toHaveCount(incident);
+    });
+
+    test('clicking a node highlights it in the vertex list', async ({ page }) => {
+      const p = await graphPoints(page);
+      await page.mouse.click(p.nodes.C1.x, p.nodes.C1.y);
+      await page.waitForTimeout(300);
+      await expect(page.locator('#nodeList .node-row.selected')).toHaveCount(1);
+    });
+
+    test('right-click menu on a node offers edit and delete', async ({ page }) => {
+      const p = await graphPoints(page);
+      await page.mouse.click(p.nodes.C8.x, p.nodes.C8.y, { button: 'right' });
+      const menu = page.locator('#contextMenu');
+      await expect(menu).toBeVisible();
+      await expect(menu).toContainText('Edit name / group');
+      await expect(menu).toContainText('Delete node');
+    });
+
+    test('right-click delete removes the node', async ({ page }) => {
+      const p = await graphPoints(page);
+      await page.mouse.click(p.nodes.C8.x, p.nodes.C8.y, { button: 'right' });
+      await page.locator('#contextMenu button', { hasText: 'Delete node' }).click();
+      await expect(page.locator('#nodeList .node-row')).toHaveCount(7);
+      const removed = isDirected ? 14 : 7;
+      await expect(page.locator('#edgeList .edge-row')).toHaveCount(START_EDGES - removed);
+    });
+
+    test('right-click menu on an edge deletes it', async ({ page }) => {
+      const pt = await edgePoint(page, 'C3', 'C4');
+      expect(pt).not.toBeNull();
+      await page.mouse.click(pt.x, pt.y, { button: 'right' });
+      const menu = page.locator('#contextMenu');
+      await expect(menu).toBeVisible();
+      await expect(menu).toContainText('Delete edge');
+      await menu.locator('button', { hasText: 'Delete edge' }).click();
+      const removed = isDirected ? 2 : 1;
+      await expect(page.locator('#edgeList .edge-row')).toHaveCount(START_EDGES - removed);
+    });
+
+    test('right-click empty canvas adds a node', async ({ page }) => {
+      const far = await farCorner(page);
+      await page.mouse.click(far.x, far.y, { button: 'right' });
+      const menu = page.locator('#contextMenu');
+      await expect(menu).toBeVisible();
+      await expect(menu).toContainText('Add node');
+      await menu.locator('button', { hasText: 'Add node' }).click();
+      await expect(page.locator('#nodeList .node-row')).toHaveCount(9);
+    });
+
+    test('auto-layout enables undo, undo restores', async ({ page }) => {
+      await expect(page.locator('#btnUndoLayout')).toBeDisabled();
+      await page.click('#btnAutoLayout');
+      await page.waitForTimeout(1500);
+      await expect(page.locator('#btnUndoLayout')).toBeEnabled();
+      await page.click('#btnUndoLayout');
+      await expect(page.locator('#btnUndoLayout')).toBeDisabled();
+    });
+
+    test('edge labels toggle on and off', async ({ page }) => {
+      const off = await darkTextPixels(page);
+      await page.click('#btnEdgeLabels');
+      await page.waitForTimeout(300);
+      const on = await darkTextPixels(page);
+      expect(on).toBeGreaterThan(off * 1.5);
+      await page.click('#btnEdgeLabels');
+      await page.waitForTimeout(300);
+      const offAgain = await darkTextPixels(page);
+      expect(offAgain).toBeLessThan(on * 0.7);
+    });
+
+    test('creates a new complete graph with N nodes', async ({ page }) => {
+      await page.fill('#nodeCount', '5');
+      page.on('dialog', (d) => d.accept());
+      await page.click('#btnNew');
+      await settle(page);
+      await expect(page.locator('#nodeList .node-row')).toHaveCount(5);
+      const expected = isDirected ? 20 : 10;
+      await expect(page.locator('#edgeList .edge-row')).toHaveCount(expected);
+    });
+
+    test('saves and exports the graph', async ({ page }) => {
+      await page.fill('#graphName', 'Mode Check');
+      const [saveDl] = await Promise.all([
+        page.waitForEvent('download'),
+        page.click('#btnSave'),
+      ]);
+      const json = JSON.parse(fs.readFileSync(await saveDl.path(), 'utf8'));
+      expect(json.directed).toBe(isDirected);
+      expect(json.edges).toHaveLength(START_EDGES);
+
+      await page.click('#btnExport');
+      const [dl] = await Promise.all([
+        page.waitForEvent('download'),
+        page.click('#exportMenu button[data-format="gml"]'),
+      ]);
+      const gml = fs.readFileSync(await dl.path(), 'utf8');
+      expect(gml).toContain(isDirected ? 'directed 1' : 'directed 0');
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Mode switching: assert the exact expected state after each switch.
+// ---------------------------------------------------------------------------
+
+test.describe('mode switching', () => {
+  test('undirected -> directed doubles edges and marks the graph directed', async ({ page }) => {
+    page.on('dialog', (d) => d.accept());
+    await page.click('#btnMode');
+    await settle(page);
+    await expect(page.locator('#btnMode')).toHaveText('Mode: directed');
+    await expect(page.locator('#stats')).toContainText('56 edges');
+    await expect(page.locator('#stats')).toContainText('directed');
+    // every pair now has both directions as separate rows
+    await expect(page.locator('.edge-row[data-key="C1__C2"] .edge-label')).toHaveText('C1 → C2');
+    await expect(page.locator('.edge-row[data-key="C2__C1"] .edge-label')).toHaveText('C2 → C1');
+  });
+
+  test('directed -> undirected merges pairs and keeps a lone directed edge', async ({ page }) => {
+    page.on('dialog', (d) => d.accept());
+    await page.click('#btnMode'); // -> directed
+    await settle(page);
+    // remove one direction so C1-C2 becomes a lone directed edge (C2 -> C1)
+    await page.locator('.edge-row[data-key="C1__C2"] .edge-del').click();
+    await expect(page.locator('#edgeList .edge-row')).toHaveCount(55);
+    // switch back
+    await page.click('#btnMode'); // -> undirected
+    await settle(page);
+    await expect(page.locator('#btnMode')).toHaveText('Mode: undirected');
+    await expect(page.locator('#stats')).toContainText('undirected');
+    // the lone C2 -> C1 became one undirected C1-C2 edge; all other pairs merged
+    await expect(page.locator('#edgeList .edge-row')).toHaveCount(28);
+    await expect(page.locator('.edge-row[data-key="C1__C2"] .edge-val')).toHaveText('0.90');
+  });
+
+  test('a new complete graph inherits the current mode', async ({ page }) => {
+    page.on('dialog', (d) => d.accept());
+    await page.click('#btnMode'); // -> directed
+    await settle(page);
+    await page.fill('#nodeCount', '4');
+    await page.click('#btnNew');
+    await settle(page);
+    await expect(page.locator('#btnMode')).toHaveText('Mode: directed');
+    await expect(page.locator('#stats')).toContainText('12 edges'); // complete directed 4*3
+  });
+});
