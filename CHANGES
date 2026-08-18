@@ -7,10 +7,12 @@ New feature: support for **directed graphs** (in addition to undirected ones).
 
 - global **directed/undirected mode** with a toolbar toggle (`Mode: …`); the mode
   is stored in the JSON (`"directed": true`) and shown in the stats line
-- switching mode is destructive (a confirmation is asked): undirected → directed
-  doubles the edge count (each edge becomes two directed edges, weights copied);
-  directed → undirected merges a bidirectional pair into one edge using the **mean**
-  weight (a lone directed edge is kept as-is)
+- destructive actions ask for confirmation: switching the graph mode, and
+  **"New complete graph"** (which replaces the current graph)
+- conversion rules: undirected → directed doubles the edge count (each edge
+  becomes two directed edges, weights copied); directed → undirected merges a
+  bidirectional pair into one edge using the **mean** weight (a lone directed
+  edge is kept as-is)
 - directed edges are drawn with **arrow tips**; a bidirectional pair (A→B and B→A)
   renders as a **single line with an arrowhead at both ends** (no second curve)
 - per-direction edge **weights**; on the canvas a pair's label shows both numbers

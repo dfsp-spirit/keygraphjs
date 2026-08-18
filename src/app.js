@@ -1571,9 +1571,14 @@
     document.getElementById('btnNew').addEventListener('click', function () {
       var n = parseInt(document.getElementById('nodeCount').value, 10);
       if (!isFinite(n) || n < 1) n = NUM_NODES;
+      var edgeCount = graph.directed ? n * (n - 1) : n * (n - 1) / 2;
+      var msg = 'Replace the current graph with a new complete graph (' + n + ' nodes, ' +
+        edgeCount + ' edges, ' + (graph.directed ? 'directed' : 'undirected') + ')?\n' +
+        'This removes the current graph (' + graph.nodes.length + ' nodes, ' +
+        graph.edges.length + ' edges).';
+      if (!window.confirm(msg)) return;
       graph = newCompleteGraph(n, graph.directed);
       rebuild();
-      var edgeCount = graph.directed ? n * (n - 1) : n * (n - 1) / 2;
       setMessage('New complete graph (' + n + ' nodes, ' + edgeCount + ' edges, ' +
         (graph.directed ? 'directed' : 'undirected') + ').');
     });

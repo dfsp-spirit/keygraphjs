@@ -117,10 +117,20 @@ test('adds a fully connected node via the Add node menu', async ({ page }) => {
 
 test('creates a new complete graph with N nodes', async ({ page }) => {
   await page.fill('#nodeCount', '5');
+  page.on('dialog', (d) => d.accept());
   await page.click('#btnNew');
   await settle(page);
   await expect(page.locator('#nodeList .node-row')).toHaveCount(5);
   await expect(page.locator('#edgeList .edge-row')).toHaveCount(10);
+});
+
+test('cancelling "New complete graph" leaves the current graph untouched', async ({ page }) => {
+  await page.fill('#nodeCount', '3');
+  page.on('dialog', (d) => d.dismiss());
+  await page.click('#btnNew');
+  await settle(page);
+  await expect(page.locator('#nodeList .node-row')).toHaveCount(8); // sample graph unchanged
+  await expect(page.locator('#edgeList .edge-row')).toHaveCount(28);
 });
 
 test('edge labels can be turned on and off again', async ({ page }) => {
