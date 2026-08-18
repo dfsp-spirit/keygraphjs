@@ -189,7 +189,7 @@
       <button id="btnLoad" title="JSON, GML, graphML">Load file…</button>
       <button id="btnSave" title="Save in JSON format.">Save file…</button>
       <div class="export-wrap" id="exportWrap">
-        <button id="btnExport" title="Export the graph in a standard graph format">Export…</button>
+        <button id="btnExport" title="Export the graph in a standard graph format" aria-haspopup="true" aria-expanded="false">Export…</button>
         <div class="export-menu" id="exportMenu" hidden>
           <button type="button" data-format="gml">GML (.gml)</button>
           <button type="button" data-format="graphml">GraphML (.graphml)</button>
@@ -199,9 +199,9 @@
     </div>
     <div class="toolbar-group">
       <button id="btnNew" title="Create a complete graph with the given node count">New complete graph</button>
-      <input type="number" id="nodeCount" min="1" max="64" value="8" title="Node count for a new complete graph" />
+      <input type="number" id="nodeCount" min="1" max="64" value="8" title="Node count for a new complete graph" aria-label="Node count for a new complete graph" />
       <div class="export-wrap" id="addNodeWrap">
-        <button id="btnAddNode" title="Add a node (isolated or fully connected)">Add node</button>
+        <button id="btnAddNode" title="Add a node (isolated or fully connected)" aria-haspopup="true" aria-expanded="false">Add node</button>
         <div class="export-menu addnode-menu" id="addNodeMenu" hidden>
           <button type="button" data-mode="isolated">Isolated</button>
           <button type="button" data-mode="connected">Fully connected</button>
@@ -219,13 +219,13 @@
   </div>
 </header>
 <main>
-  <div id="network"></div>
+  <div id="network" role="img" aria-label="Graph canvas"></div>
   <div id="resizer" title="Drag to resize the sidebar"></div>
   <div id="sidebar">
     <h2>Graph</h2>
-    <input type="text" id="graphName" class="graph-name-input" placeholder="Graph name (saved in JSON)" />
+    <input type="text" id="graphName" class="graph-name-input" placeholder="Graph name (saved in JSON)" aria-label="Graph name" />
     <div class="stats" id="stats"></div>
-    <div class="hint" id="message">Click two nodes with "Connect nodes" to add an edge. Click an edge to jump to it in the list. Drag nodes to arrange.</div>
+    <div class="hint" id="message" role="status" aria-live="polite">Click two nodes with "Connect nodes" to add an edge. Click an edge to jump to it in the list. Drag nodes to arrange.</div>
     <h2>Nodes — name &amp; group</h2>
     <div id="nodeList"></div>
     <h2>Edges — weight (0–1)</h2>
@@ -236,7 +236,7 @@
       <button id="btnBulkClear" title="Clear selection">Clear</button>
     </div>
     <div class="edge-row select-all-row">
-      <input type="checkbox" id="selectAllEdges" title="Select all edges">
+      <input type="checkbox" id="selectAllEdges" title="Select all edges" aria-label="Select all edges">
       <span class="edge-label">Select all</span>
     </div>
     <div id="edgeList"></div>

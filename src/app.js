@@ -592,6 +592,9 @@
     document.getElementById('stats').textContent =
       n + ' nodes \u00b7 ' + graph.edges.length + ' edges (complete = ' + expected + ') \u00b7 ' +
       (graph.directed ? 'directed' : 'undirected');
+    // Accessible description of the canvas graph, kept in sync with the stats.
+    document.getElementById('network').setAttribute('aria-label',
+      n + ' nodes, ' + graph.edges.length + ' edges, ' + (graph.directed ? 'directed' : 'undirected') + ' graph');
   }
 
   function collectGroups() {
@@ -652,11 +655,13 @@
       editBtn.className = 'node-edit';
       editBtn.textContent = '\u270e'; // pencil
       editBtn.title = 'Edit name / group';
+      editBtn.setAttribute('aria-label', 'Edit name/group of node ' + n.id);
 
       var del = document.createElement('button');
       del.className = 'edge-del';
       del.textContent = '\u2715';
       del.title = 'Remove this node (and its edges)';
+      del.setAttribute('aria-label', 'Remove node ' + n.id);
       del.addEventListener('click', function () { deleteNode(n.id); });
 
       // line 2: vertex weight slider (mirrors the edge rows)
@@ -674,6 +679,7 @@
       weightSlider.max = 1;
       weightSlider.step = 0.01;
       weightSlider.value = n.weight;
+      weightSlider.setAttribute('aria-label', 'Weight of node ' + n.id);
 
       var weightVal = document.createElement('span');
       weightVal.className = 'node-val';
@@ -699,6 +705,7 @@
       labelInput.value = n.label || '';
       labelInput.placeholder = 'name';
       labelInput.title = 'Human-readable name (optional).';
+      labelInput.setAttribute('aria-label', 'Name of node ' + n.id);
       labelInput.addEventListener('input', function () {
         n.label = labelInput.value;
         nameSpan.textContent = labelInput.value || n.id;
@@ -714,6 +721,7 @@
       groupInput.value = n.group || '';
       groupInput.placeholder = 'group';
       groupInput.title = 'Group metadata (optional). Type a name or pick one.';
+      groupInput.setAttribute('aria-label', 'Group of node ' + n.id);
       var applyGroup = function () {
         n.group = groupInput.value.trim();
         swatch.style.background = groupColor(n.group);
@@ -778,9 +786,13 @@
       row.className = 'edge-row';
       row.setAttribute('data-key', e.source + '__' + e.target);
 
+      var sep = graph.directed ? ' \u2192 ' : ' \u2014 ';
+      var edgeName = labelOf(e.source) + sep + labelOf(e.target);
+
       var cb = document.createElement('input');
       cb.type = 'checkbox';
       cb.title = 'Select for bulk editing';
+      cb.setAttribute('aria-label', 'Select edge ' + edgeName + ' for bulk editing');
       cb.checked = bulkSelected.has(e);
       cb.addEventListener('change', function () {
         if (cb.checked) bulkSelected.add(e); else bulkSelected.delete(e);
@@ -790,8 +802,8 @@
 
       var lbl = document.createElement('span');
       lbl.className = 'edge-label';
-      lbl.textContent = labelOf(e.source) + (graph.directed ? ' \u2192 ' : ' \u2014 ') + labelOf(e.target);
-      lbl.title = e.source + (graph.directed ? ' \u2192 ' : ' \u2014 ') + e.target;
+      lbl.textContent = edgeName;
+      lbl.title = edgeName;
 
       var slider = document.createElement('input');
       slider.type = 'range';
@@ -799,6 +811,7 @@
       slider.max = 1;
       slider.step = 0.01;
       slider.value = e.weight;
+      slider.setAttribute('aria-label', 'Weight of edge ' + edgeName);
 
       var val = document.createElement('span');
       val.className = 'edge-val';
@@ -814,6 +827,7 @@
       del.className = 'edge-del';
       del.textContent = '\u2715';
       del.title = 'Remove this edge';
+      del.setAttribute('aria-label', 'Remove edge ' + edgeName);
       del.addEventListener('click', function () { deleteEdge(e.source, e.target); });
 
       row.appendChild(cb);
@@ -1262,10 +1276,14 @@
     var wasHidden = menu.hidden;
     menu.hidden = true;
     if (wasHidden) menu.hidden = false;
+    var btn = document.getElementById('btnExport');
+    if (btn) btn.setAttribute('aria-expanded', wasHidden ? 'true' : 'false');
   }
 
   function closeExportMenu() {
     document.getElementById('exportMenu').hidden = true;
+    var btn = document.getElementById('btnExport');
+    if (btn) btn.setAttribute('aria-expanded', 'false');
   }
 
   function toggleAddNodeMenu() {
@@ -1273,10 +1291,14 @@
     var wasHidden = menu.hidden;
     menu.hidden = true;
     if (wasHidden) menu.hidden = false;
+    var btn = document.getElementById('btnAddNode');
+    if (btn) btn.setAttribute('aria-expanded', wasHidden ? 'true' : 'false');
   }
 
   function closeAddNodeMenu() {
     document.getElementById('addNodeMenu').hidden = true;
+    var btn = document.getElementById('btnAddNode');
+    if (btn) btn.setAttribute('aria-expanded', 'false');
   }
 
   // ---------------------------------------------------------- context menu
@@ -1406,6 +1428,8 @@
     var el = document.getElementById('message');
     el.textContent = text;
     el.className = 'hint' + (isError ? ' error' : '');
+    // Status is announced politely, errors assertively.
+    el.setAttribute('role', isError ? 'alert' : 'status');
   }
 
   function getEdgeRow(key) {

@@ -22,6 +22,10 @@ New feature: support for **directed graphs** (in addition to undirected ones).
   pair deletes **both** directions (use the list to delete a single direction)
 - import/export: GML `directed 1/0`, GraphML `edgedefault=`, DOT `digraph` / `->`;
   mixed graphs (per-edge overrides of the graph default) are rejected on import
+- accessibility: accessible names (`aria-label`) for the weight sliders, icon
+  buttons and checkboxes; the status message is a live region (polite, assertive
+  for errors); the graph canvas has an accessible label synced with the stats;
+  the Export…/Add node dropdown buttons expose `aria-expanded`
 
 ### v0.1.0 -- Initial release
 
