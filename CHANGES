@@ -4,8 +4,9 @@
 ### Current WIP
 
 
-
 ### v0.1.0 -- Initial release
+
+Most relevant features:
 
 - display and edit undirected graphs, option for edge weights and vertex weights
 - drag nodes and run a one-shot force-directed **auto-layout** (with undo)
