@@ -31,6 +31,14 @@ GitHub Pages.
 
 **[dfsp-spirit.github.io/keygraphjs](https://dfsp-spirit.github.io/keygraphjs/)**
 
+
+## Running it locally
+
+Download [a release](https://dfsp-spirit.github.io/keygraphjs/releases) and unzip it or clone this repo.
+
+Then double-click the `index.html` file to open it with your favorite browser.
+
+
 ## Import & Export
 
 **Load file…** opens graphs in JSON, **GML** and **GraphML** (the format is
