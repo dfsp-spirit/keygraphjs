@@ -2,13 +2,15 @@
 
 [![Tests](https://github.com/dfsp-spirit/keygraphjs/actions/workflows/e2e.yml/badge.svg)](https://github.com/dfsp-spirit/keygraphjs/actions/workflows/e2e.yml)
 
-A small, dependency-free web editor for **undirected, edge-weighted graphs**. It runs entirely in
-the browser — no server, no build step — and reads/writes a simple JSON format.
+A small, dependency-free web editor for **undirected and directed, edge-weighted graphs**. It runs
+entirely in the browser — no server, no build step — and reads/writes a simple JSON format.
 
 ## About
 
 Keygraph.js lets you:
 
+- work on **undirected or directed** graphs — a toolbar toggle switches the mode
+  (destructive, with confirmation); the mode is stored in the JSON and shown in the stats,
 - drag nodes and run a one-shot force-directed **auto-layout** (with undo),
 - add and remove nodes, and connect nodes to add edges,
 - edit edge **weights** (0–1) per edge, or select several and set them all at once,
@@ -17,6 +19,10 @@ Keygraph.js lets you:
 - toggle edge-weight labels in the view, and
 - **load and save** graphs in JSON or standard formats (GML, GraphML) via the
   file dialog, and **export** them to GML, GraphML or DOT for other tools.
+
+Directed edges are drawn with arrow tips; a bidirectional pair (A→B and B→A) is shown
+as a single line with an arrowhead at each end, and its two weights are listed as
+`0.90 | 0.30` when edge labels are on.
 
 Open `index.html` directly (works fully offline) or serve it as static files — for example via
 GitHub Pages.
@@ -29,7 +35,9 @@ GitHub Pages.
 
 **Load file…** opens graphs in JSON, **GML** and **GraphML** (the format is
 auto-detected from the file content), so graphs saved by other tools load
-directly. **Export…** writes the current graph to a standard format:
+directly. Directedness is detected from the file: GML `directed 1`, GraphML
+`edgedefault="directed"`, or the JSON `directed` flag. **Export…** writes the
+current graph to a standard format:
 
 - **GML** (`.gml`) — compact, plain-text format (igraph, NetworkX, Gephi, yEd).
 - **GraphML** (`.graphml`) — XML with typed attributes; the most widely supported

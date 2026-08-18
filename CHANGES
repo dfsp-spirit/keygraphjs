@@ -1,8 +1,25 @@
-## keygraphjs CHangelog
+## keygraphjs Changelog
 
 
 ### Current WIP
 
+New feature: support for **directed graphs** (in addition to undirected ones).
+
+- global **directed/undirected mode** with a toolbar toggle (`Mode: …`); the mode
+  is stored in the JSON (`"directed": true`) and shown in the stats line
+- switching mode is destructive (a confirmation is asked): undirected → directed
+  doubles the edge count (each edge becomes two directed edges, weights copied);
+  directed → undirected merges a bidirectional pair into one edge using the **mean**
+  weight (a lone directed edge is kept as-is)
+- directed edges are drawn with **arrow tips**; a bidirectional pair (A→B and B→A)
+  renders as a **single line with an arrowhead at both ends** (no second curve)
+- per-direction edge **weights**; on the canvas a pair's label shows both numbers
+  ("0.90 | 0.30"; first = lower-id → higher-id), the tooltip lists both directions
+- "Add node → fully connected" adds edges in **both directions** in directed mode;
+  "Connect nodes" treats A→B and B→A as distinct edges; right-clicking a collapsed
+  pair deletes **both** directions (use the list to delete a single direction)
+- import/export: GML `directed 1/0`, GraphML `edgedefault=`, DOT `digraph` / `->`;
+  mixed graphs (per-edge overrides of the graph default) are rejected on import
 
 ### v0.1.0 -- Initial release
 

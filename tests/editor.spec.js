@@ -521,3 +521,218 @@ test('loads a GML file', async ({ page }) => {
   // GML node ids are integers (0..7); the human labels (C1…) survive
   await expect(page.locator('#nodeList .node-row').first().locator('.node-name')).toHaveText('C1');
 });
+
+// ---------------------------------------------------------------------------
+// Directed-graph mode
+// ---------------------------------------------------------------------------
+
+// The destructive mode toggle asks for confirmation; accept it.
+async function toggleMode(page) {
+  await page.click('#btnMode');
+  await settle(page);
+}
+
+test('switches to directed mode (edges doubled) and back (pairs merged with mean)', async ({ page }) => {
+  await expect(page.locator('#btnMode')).toHaveText('Mode: undirected');
+  await expect(page.locator('#stats')).toContainText('undirected');
+
+  page.on('dialog', (d) => d.accept());
+  await toggleMode(page);
+
+  await expect(page.locator('#btnMode')).toHaveText('Mode: directed');
+  await expect(page.locator('#stats')).toContainText('directed');
+  await expect(page.locator('#edgeList .edge-row')).toHaveCount(56); // 28 doubled
+  // A bidirectional pair is shown as two directed rows.
+  await expect(page.locator('.edge-row[data-key="C1__C2"] .edge-label')).toHaveText('C1 → C2');
+  await expect(page.locator('.edge-row[data-key="C2__C1"] .edge-label')).toHaveText('C2 → C1');
+
+  // Give the C1->C2 direction a different weight, then merge back: mean applies.
+  await page.locator('.edge-row[data-key="C1__C2"] input[type="range"]').evaluate((el, v) => {
+    el.value = v;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  }, '0.30');
+  await expect(page.locator('.edge-row[data-key="C1__C2"] .edge-val')).toHaveText('0.30');
+
+  await toggleMode(page); // directed -> undirected
+  await expect(page.locator('#btnMode')).toHaveText('Mode: undirected');
+  await expect(page.locator('#edgeList .edge-row')).toHaveCount(28);
+  await expect(page.locator('.edge-row[data-key="C1__C2"] .edge-val')).toHaveText('0.60'); // (0.90 + 0.30) / 2
+});
+
+test('adds a fully connected node in directed mode (both directions)', async ({ page }) => {
+  page.on('dialog', (d) => d.accept());
+  await toggleMode(page);
+
+  await page.click('#btnAddNode');
+  await page.locator('#addNodeMenu button[data-mode="connected"]').click();
+  await expect(page.locator('#nodeList .node-row')).toHaveCount(9);
+  await expect(page.locator('#edgeList .edge-row')).toHaveCount(72); // 56 + 2*8
+  await expect(page.locator('#stats')).toContainText('72 edges');
+});
+
+test('connect mode adds the missing direction of a pair', async ({ page }) => {
+  page.on('dialog', (d) => d.accept());
+  await toggleMode(page);
+
+  // Remove the C1 -> C2 direction only; C2 -> C1 must remain.
+  await page.locator('.edge-row[data-key="C1__C2"] .edge-del').click();
+  await expect(page.locator('#edgeList .edge-row')).toHaveCount(55);
+
+  // Re-connect C1 -> C2; in directed mode this is a distinct edge from C2 -> C1.
+  const p = await graphPoints(page);
+  await page.click('#btnConnect');
+  await page.mouse.click(p.nodes.C1.x, p.nodes.C1.y);
+  await page.mouse.click(p.nodes.C2.x, p.nodes.C2.y);
+  await page.waitForTimeout(200);
+  await expect(page.locator('#edgeList .edge-row')).toHaveCount(56);
+});
+
+test('deletes both directions of a collapsed pair via the context menu', async ({ page }) => {
+  page.on('dialog', (d) => d.accept());
+  await toggleMode(page);
+
+  const pt = await page.evaluate(() => {
+    const n = window.__graphEditor;
+    const P = n.getPositions();
+    const c = document.getElementById('network').getBoundingClientRect();
+    const vp = (x, y) => { const d = n.canvasToDOM({ x, y }); return { x: d.x + c.x, y: d.y + c.y }; };
+    const rel = (x, y) => ({ x: x - c.x, y: y - c.y });
+    const a = P['C1'], b = P['C2'];
+    for (const t of [0.5, 0.4, 0.6, 0.3, 0.7, 0.45, 0.55]) {
+      const q = vp(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t);
+      const r = rel(q.x, q.y);
+      if (!n.getNodeAt(r) && n.getEdgeAt(r)) return q;
+    }
+    return null;
+  });
+  expect(pt).not.toBeNull();
+  await page.mouse.click(pt.x, pt.y, { button: 'right' });
+  const menu = page.locator('#contextMenu');
+  await expect(menu).toBeVisible();
+  await expect(menu).toContainText('Delete edge (both directions)');
+  await menu.locator('button', { hasText: 'both directions' }).click();
+  await expect(page.locator('#edgeList .edge-row')).toHaveCount(54); // 56 - 2
+});
+
+test('exports a directed graph as GML, GraphML and DOT', async ({ page }) => {
+  page.on('dialog', (d) => d.accept());
+  await toggleMode(page);
+
+  const count = (text, needle) => text.split(needle).length - 1;
+  const cases = [
+    { fmt: 'gml', marker: 'directed 1', edges: (t) => count(t, '  edge [') },
+    { fmt: 'graphml', marker: 'edgedefault="directed"', edges: (t) => count(t, '<edge ') },
+    { fmt: 'dot', marker: 'digraph G {', edges: (t) => count(t, ' -> ') },
+  ];
+  for (const c of cases) {
+    await page.click('#btnExport');
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      page.click(`#exportMenu button[data-format="${c.fmt}"]`),
+    ]);
+    const text = fs.readFileSync(await download.path(), 'utf8');
+    expect(text).toContain(c.marker);
+    expect(c.edges(text)).toBe(56);
+  }
+
+  // DOT for a directed graph must not use the undirected ' -- ' separator.
+  await page.click('#btnExport');
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.click('#exportMenu button[data-format="dot"]'),
+  ]);
+  expect(fs.readFileSync(await download.path(), 'utf8')).not.toContain(' -- ');
+});
+
+test('saves and reloads the directed flag in JSON', async ({ page }) => {
+  page.on('dialog', (d) => d.accept());
+  await toggleMode(page);
+
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.click('#btnSave'),
+  ]);
+  const json = JSON.parse(fs.readFileSync(await download.path(), 'utf8'));
+  expect(json.directed).toBe(true);
+  expect(json.edges).toHaveLength(56);
+
+  // Round-trip: load the saved file back; the mode must be restored.
+  const [chooser] = await Promise.all([
+    page.waitForEvent('filechooser'),
+    page.click('#btnLoad'),
+  ]);
+  await chooser.setFiles({ name: 'roundtrip.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(json)) });
+  await settle(page);
+  await expect(page.locator('#btnMode')).toHaveText('Mode: directed');
+  await expect(page.locator('#edgeList .edge-row')).toHaveCount(56);
+});
+
+test('loads a directed GML file and keeps both directions', async ({ page }) => {
+  const gml = [
+    'graph [',
+    '  directed 1',
+    '  node [ id 0 label "A" ]',
+    '  node [ id 1 label "B" ]',
+    '  edge [ source 0 target 1 weight 0.4 ]',
+    '  edge [ source 1 target 0 weight 0.9 ]',
+    ']'
+  ].join('\n');
+  const [chooser] = await Promise.all([
+    page.waitForEvent('filechooser'),
+    page.click('#btnLoad'),
+  ]);
+  await chooser.setFiles({ name: 'directed.gml', mimeType: 'application/x-gml', buffer: Buffer.from(gml) });
+  await settle(page);
+  await expect(page.locator('#btnMode')).toHaveText('Mode: directed');
+  await expect(page.locator('#edgeList .edge-row')).toHaveCount(2);
+  await expect(page.locator('.edge-row[data-key="0__1"] .edge-label')).toHaveText('A → B');
+  await expect(page.locator('.edge-row[data-key="1__0"] .edge-label')).toHaveText('B → A');
+});
+
+test('loads a directed GraphML file', async ({ page }) => {
+  const graphml = [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<graphml xmlns="http://graphml.graphdrawing.org/xmlns">',
+    '  <key id="d_weight" for="edge" attr.name="weight" attr.type="double"/>',
+    '  <graph id="G" edgedefault="directed">',
+    '    <node id="A"/>',
+    '    <node id="B"/>',
+    '    <edge source="A" target="B"><data key="d_weight">0.4</data></edge>',
+    '    <edge source="B" target="A"><data key="d_weight">0.9</data></edge>',
+    '  </graph>',
+    '</graphml>'
+  ].join('\n');
+  const [chooser] = await Promise.all([
+    page.waitForEvent('filechooser'),
+    page.click('#btnLoad'),
+  ]);
+  await chooser.setFiles({ name: 'directed.graphml', mimeType: 'application/xml', buffer: Buffer.from(graphml) });
+  await settle(page);
+  await expect(page.locator('#btnMode')).toHaveText('Mode: directed');
+  await expect(page.locator('#edgeList .edge-row')).toHaveCount(2);
+  await expect(page.locator('.edge-row[data-key="A__B"] .edge-val')).toHaveText('0.40');
+  await expect(page.locator('.edge-row[data-key="B__A"] .edge-val')).toHaveText('0.90');
+});
+
+test('rejects a mixed GraphML file (per-edge override of edgedefault)', async ({ page }) => {
+  const graphml = [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<graphml xmlns="http://graphml.graphdrawing.org/xmlns">',
+    '  <graph id="G" edgedefault="undirected">',
+    '    <node id="A"/>',
+    '    <node id="B"/>',
+    '    <edge source="A" target="B" directed="true"/>',
+    '  </graph>',
+    '</graphml>'
+  ].join('\n');
+  const [chooser] = await Promise.all([
+    page.waitForEvent('filechooser'),
+    page.click('#btnLoad'),
+  ]);
+  await chooser.setFiles({ name: 'mixed.graphml', mimeType: 'application/xml', buffer: Buffer.from(graphml) });
+  await settle(page);
+  await expect(page.locator('#message')).toContainText('Failed to load');
+  await expect(page.locator('#message')).toContainText('mixed');
+  // The previous graph is untouched.
+  await expect(page.locator('#edgeList .edge-row')).toHaveCount(28);
+});

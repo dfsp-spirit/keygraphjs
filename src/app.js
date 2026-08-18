@@ -6,12 +6,15 @@
  * The JSON it reads/writes:
  *   {
  *     "meta": { "name": "...", "description": "..." },
+ *     "directed": false,   // true for directed graphs (absent = undirected)
  *     "nodes": [ { "id": "C1", "label": "crown", "group": "A", "weight": 0.5 }, ... ],
  *     "edges": [ { "source": "C1", "target": "C2", "weight": 0.90 }, ... ]
  *   }
  *
  * `nodes[].id`, `nodes[].weight`, `edges[].source/target/weight` carry the graph
  * data; `label` and `group` are human metadata; `x`/`y` are optional layout hints.
+ * In directed mode a bidirectional pair is stored as two edges (A->B and B->A)
+ * and rendered as a single double-arrowed edge.
  */
 (function () {
   'use strict';
@@ -39,7 +42,7 @@
     return GROUP_PALETTE[h % GROUP_PALETTE.length];
   }
 
-  var graph = null;      // { meta, nodes, edges }
+  var graph = null;      // { meta, directed, nodes, edges }
   var network = null;
   var connectMode = false;
   var connectSource = null;
@@ -53,7 +56,7 @@
 
   function nodeId(i) { return 'C' + (i + 1); }
 
-  function newCompleteGraph(n) {
+  function newCompleteGraph(n, directed) {
     n = n || NUM_NODES;
     var nodes = [];
     for (var i = 0; i < n; i++) {
@@ -63,9 +66,10 @@
     for (var a = 0; a < n; a++) {
       for (var b = a + 1; b < n; b++) {
         edges.push({ source: nodeId(a), target: nodeId(b), weight: DEFAULT_WEIGHT });
+        if (directed) edges.push({ source: nodeId(b), target: nodeId(a), weight: DEFAULT_WEIGHT });
       }
     }
-    return { meta: { name: '', description: '' }, nodes: nodes, edges: edges };
+    return { meta: { name: '', description: '' }, directed: !!directed, nodes: nodes, edges: edges };
   }
 
   // The README example: two communities (A, B) and two hubs, with the exact
@@ -93,6 +97,7 @@
     }
     return {
       meta: { name: 'A/B/hub example', description: 'Communities A and B, hubs C7/C8 (README weights).' },
+      directed: false,
       nodes: nodes,
       edges: edges
     };
@@ -142,9 +147,112 @@
     });
     return {
       meta: { name: (parsed.meta && parsed.meta.name) || '', description: (parsed.meta && parsed.meta.description) || '' },
+      directed: !!parsed.directed,
       nodes: nodes,
       edges: edges
     };
+  }
+
+  // ------------------------------------------------- directed/undirected mode
+
+  // Canonical "lowest id first" ordering for an unordered node pair, so a
+  // bidirectional pair (A->B and B->A) is recognized as one unit regardless of
+  // storage order. Ids are usually "C"+number; compare numerically when both
+  // look like that, otherwise fall back to plain string comparison.
+  function idNum(id) {
+    var m = /^C(\d+)$/.exec(String(id));
+    return m ? Number(m[1]) : null;
+  }
+  function idLess(a, b) {
+    var na = idNum(a), nb = idNum(b);
+    if (na !== null && nb !== null) return na < nb;
+    return String(a) < String(b);
+  }
+  function pairOrder(a, b) {
+    return idLess(a, b) ? [a, b] : [b, a];
+  }
+  function pairKey(a, b) {
+    var o = pairOrder(a, b);
+    return o[0] + '__' + o[1];
+  }
+
+  // The model edges (0, 1 or 2) connecting the unordered pair {a, b}.
+  function pairEdges(a, b) {
+    return graph.edges.filter(function (e) {
+      return (e.source === a && e.target === b) || (e.source === b && e.target === a);
+    });
+  }
+
+  // Does model edge e correspond to vis edge key `key`? In directed mode a
+  // collapsed pair edge is keyed by the canonical order, so both directions
+  // match it; in undirected mode only the exact stored order matches.
+  function matchesVisKey(e, key) {
+    if (e.source + '__' + e.target === key) return true;
+    return !!graph.directed && (e.target + '__' + e.source === key);
+  }
+
+  // Expand vis edge keys into the sidebar row keys they represent (a collapsed
+  // bidirectional pair expands to both of its rows).
+  function edgeRowKeysForVisKeys(keys) {
+    var out = [];
+    keys.forEach(function (k) {
+      graph.edges.forEach(function (e) {
+        if (matchesVisKey(e, k)) out.push(e.source + '__' + e.target);
+      });
+    });
+    return out;
+  }
+
+  function edgeLabel(a, b) {
+    return labelOf(a) + (graph.directed ? ' \u2192 ' : ' \u2014 ') + labelOf(b);
+  }
+
+  // Mode conversions (destructive — the toolbar toggle asks for confirmation).
+  function convertToDirected() {
+    var extra = graph.edges.map(function (e) {
+      return { source: e.target, target: e.source, weight: e.weight };
+    });
+    graph.edges = graph.edges.concat(extra);
+    graph.directed = true;
+  }
+
+  function convertToUndirected() {
+    var byPair = {};
+    graph.edges.forEach(function (e) {
+      var k = pairKey(e.source, e.target);
+      if (!byPair[k]) byPair[k] = [];
+      byPair[k].push(e.weight);
+    });
+    var edges = [];
+    Object.keys(byPair).forEach(function (k) {
+      var ws = byPair[k];
+      var sum = 0;
+      ws.forEach(function (w) { sum += w; });
+      var o = k.split('__');
+      edges.push({ source: o[0], target: o[1], weight: clampWeight(sum / ws.length) });
+    });
+    graph.edges = edges;
+    graph.directed = false;
+  }
+
+  function toggleMode() {
+    var goDirected = !graph.directed;
+    var msg = goDirected
+      ? 'Switch to directed mode? Each undirected edge becomes two directed edges (weights are copied).'
+      : 'Switch to undirected mode? Bidirectional pairs are merged into one edge (mean weight); lone directed edges are kept.';
+    if (!window.confirm(msg)) return;
+    if (goDirected) convertToDirected(); else convertToUndirected();
+    rebuild();
+    setMessage('Switched to ' + (graph.directed ? 'directed' : 'undirected') + ' mode (' +
+      graph.nodes.length + ' nodes, ' + graph.edges.length + ' edges).');
+  }
+
+  function updateModeButton() {
+    var btn = document.getElementById('btnMode');
+    if (!btn) return;
+    var directed = !!graph.directed;
+    btn.textContent = directed ? 'Mode: directed' : 'Mode: undirected';
+    btn.classList.toggle('active', directed);
   }
 
   // ------------------------------------------------------------- vis conversion
@@ -188,21 +296,63 @@
     });
   }
 
-  function edgeLabelText(e) { return showEdgeLabels ? Number(e.weight).toFixed(2) : ''; }
-
   function edgeVisObject(e) {
-    return {
-      id: e.source + '__' + e.target,
-      from: e.source,
-      to: e.target,
-      title: labelOf(e.source) + ' \u2014 ' + labelOf(e.target) + ': ' + e.weight.toFixed(2),
-      label: edgeLabelText(e),
-      color: { color: edgeColor(e.weight) }
+    return visObjectForPair(e.source, e.target);
+  }
+
+  // The vis-network edge for the node pair {a, b}: a single double-arrowed edge
+  // when both directions exist, a single-arrowed edge when only one does.
+  // Keeping one line per pair avoids the clutter of two parallel curves.
+  function visObjectForPair(a, b) {
+    var list = pairEdges(a, b);
+    if (list.length === 0) return null;
+    var o = pairOrder(a, b);
+    var low = o[0], high = o[1];
+
+    if (!graph.directed) {
+      var u = list[0];
+      return {
+        id: u.source + '__' + u.target,
+        from: u.source,
+        to: u.target,
+        title: labelOf(u.source) + ' \u2014 ' + labelOf(u.target) + ': ' + u.weight.toFixed(2),
+        label: showEdgeLabels ? Number(u.weight).toFixed(2) : '',
+        color: { color: edgeColor(u.weight) }
+      };
+    }
+
+    var lowToHigh = list.find(function (e) { return e.source === low && e.target === high; });
+    var highToLow = list.find(function (e) { return e.source === high && e.target === low; });
+    var both = !!lowToHigh && !!highToLow;
+    var single = lowToHigh || highToLow;
+
+    var out = {
+      id: low + '__' + high,
+      from: low,
+      to: high,
+      title: both
+        ? labelOf(low) + ' \u2194 ' + labelOf(high) + ' \u00b7 ' + low + ' \u2192 ' + high +
+          ' ' + lowToHigh.weight.toFixed(2) + ' \u00b7 ' + high + ' \u2192 ' + low + ' ' + highToLow.weight.toFixed(2)
+        : labelOf(single.source) + ' \u2192 ' + labelOf(single.target) + ': ' + single.weight.toFixed(2),
+      label: both
+        ? (showEdgeLabels ? Number(lowToHigh.weight).toFixed(2) + ' | ' + Number(highToLow.weight).toFixed(2) : '')
+        : (showEdgeLabels ? Number(single.weight).toFixed(2) : ''),
+      color: { color: edgeColor(single.weight) }
     };
+    out.arrows = both
+      ? { to: { enabled: true }, from: { enabled: true } }
+      : { to: { enabled: true } };
+    return out;
   }
 
   function visEdges() {
-    return graph.edges.map(edgeVisObject);
+    var seen = new Set();
+    return graph.edges.map(edgeVisObject).filter(function (o) {
+      if (!o) return false;
+      if (seen.has(o.id)) return false;  // a bidirectional pair emits one edge
+      seen.add(o.id);
+      return true;
+    });
   }
 
   function buildNetwork() {
@@ -270,10 +420,11 @@
         connectSource = null;
         setMessage('Cancelled.');
       } else {
-        addEdge(connectSource, id);
+        var src = connectSource;
+        addEdge(src, id);
         network.unselectAll();
         connectSource = null;
-        setMessage('Added edge ' + labelOf(connectSource) + ' \u2014 ' + labelOf(id) + '.');
+        setMessage('Added edge ' + edgeLabel(src, id) + '.');
       }
     } else if (params.nodes.length === 0) {
       // clicked empty canvas: cancel the pending source
@@ -295,18 +446,22 @@
 
   function edgeExists(a, b) {
     return graph.edges.some(function (e) {
-      return (e.source === a && e.target === b) || (e.source === b && e.target === a);
+      if (e.source === a && e.target === b) return true;
+      return !graph.directed && e.source === b && e.target === a;
     });
   }
 
   function addEdge(a, b) {
     if (a === b) return;
     if (edgeExists(a, b)) {
-      setMessage('Edge ' + labelOf(a) + ' \u2014 ' + labelOf(b) + ' already exists.', true);
+      setMessage('Edge ' + edgeLabel(a, b) + ' already exists.', true);
       return;
     }
     var e = { source: a, target: b, weight: DEFAULT_WEIGHT };
     graph.edges.push(e);
+    // Refresh this node pair's vis representation: adding the reverse direction
+    // of a pair must replace the single arrow with the collapsed double arrow.
+    network.body.data.edges.remove([a + '__' + b, b + '__' + a]);
     network.body.data.edges.add(edgeVisObject(e));
     renderEdgeList();
     renderStats();
@@ -314,30 +469,47 @@
 
   function deleteEdge(source, target) {
     var e = graph.edges.find(function (x) {
-      return (x.source === source && x.target === target) || (x.source === target && x.target === source);
+      if (x.source === source && x.target === target) return true;
+      return !graph.directed && x.source === target && x.target === source;
     });
     if (!e) return;
     graph.edges = graph.edges.filter(function (x) { return x !== e; });
     bulkSelected.delete(e);
     network.body.data.edges.remove([source + '__' + target, target + '__' + source]);
+    // If the other direction of a former pair still exists, draw it again.
+    var rest = visObjectForPair(source, target);
+    if (rest) network.body.data.edges.add(rest);
     renderEdgeList();
     renderStats();
-    setMessage('Removed edge ' + labelOf(source) + ' \u2014 ' + labelOf(target) + '.');
+    setMessage('Removed edge ' + edgeLabel(source, target) + '.');
   }
 
   function deleteSelectedEdges() {
     var sel = network.getSelectedEdges();
     if (sel.length === 0) { setMessage('No edge selected (click an edge first).', true); return; }
-    var keys = sel.slice();
-    graph.edges = graph.edges.filter(function (e) {
-      var key = e.source + '__' + e.target;
-      if (keys.indexOf(key) >= 0) { bulkSelected.delete(e); return false; }
-      return true;
+    var removed = graph.edges.filter(function (e) {
+      return sel.some(function (k) { return matchesVisKey(e, k); });
     });
+    if (removed.length === 0) return;
+    graph.edges = graph.edges.filter(function (e) { return removed.indexOf(e) < 0; });
+    removed.forEach(function (e) { bulkSelected.delete(e); });
     network.body.data.edges.remove(sel);
     renderEdgeList();
     renderStats();
-    setMessage('Deleted ' + sel.length + ' edge(s).');
+    setMessage('Deleted ' + removed.length + ' edge(s).');
+  }
+
+  // Delete every direction of the given vis edge key (used by the context
+  // menu: a collapsed bidirectional pair deletes both directions).
+  function deleteEdgesForVisKey(key) {
+    var removed = graph.edges.filter(function (e) { return matchesVisKey(e, key); });
+    if (removed.length === 0) return;
+    graph.edges = graph.edges.filter(function (e) { return removed.indexOf(e) < 0; });
+    removed.forEach(function (e) { bulkSelected.delete(e); });
+    network.body.data.edges.remove([key]);
+    renderEdgeList();
+    renderStats();
+    setMessage('Removed edge' + (removed.length > 1 ? 's (both directions)' : '') + '.');
   }
 
   function nextNodeId() {
@@ -376,14 +548,15 @@
     network.body.data.nodes.add(visNodeObject(n));
     graph.nodes.forEach(function (m) {
       if (m.id === id) return;
-      var e = { source: id, target: m.id, weight: DEFAULT_WEIGHT };
-      graph.edges.push(e);
-      network.body.data.edges.add(edgeVisObject(e));
+      graph.edges.push({ source: id, target: m.id, weight: DEFAULT_WEIGHT });
+      if (graph.directed) graph.edges.push({ source: m.id, target: id, weight: DEFAULT_WEIGHT });
     });
+    network.body.data.edges.clear();
+    network.body.data.edges.add(visEdges());
     renderNodeList();
     renderEdgeList();
     renderStats();
-    setMessage('Added node ' + id + ' connected to all other nodes.');
+    setMessage('Added node ' + id + ' connected to all other nodes' + (graph.directed ? ' (both directions)' : '') + '.');
   }
 
   function deleteNode(id) {
@@ -415,10 +588,10 @@
 
   function renderStats() {
     var n = graph.nodes.length;
-    var expected = n * (n - 1) / 2;
+    var expected = graph.directed ? n * (n - 1) : n * (n - 1) / 2;
     document.getElementById('stats').textContent =
-      n + ' nodes \u00b7 ' + graph.edges.length +
-      ' edges (complete = ' + expected + ')';
+      n + ' nodes \u00b7 ' + graph.edges.length + ' edges (complete = ' + expected + ') \u00b7 ' +
+      (graph.directed ? 'directed' : 'undirected');
   }
 
   function collectGroups() {
@@ -617,8 +790,8 @@
 
       var lbl = document.createElement('span');
       lbl.className = 'edge-label';
-      lbl.textContent = labelOf(e.source) + ' \u2014 ' + labelOf(e.target);
-      lbl.title = e.source + ' \u2014 ' + e.target;
+      lbl.textContent = labelOf(e.source) + (graph.directed ? ' \u2192 ' : ' \u2014 ') + labelOf(e.target);
+      lbl.title = e.source + (graph.directed ? ' \u2192 ' : ' \u2014 ') + e.target;
 
       var slider = document.createElement('input');
       slider.type = 'range';
@@ -802,7 +975,7 @@
     var tokens = tokenizeGML(text);
     if (tokens[0] !== 'graph') throw new Error('not a GML file (expected "graph [")');
     var g = parseGMLList(tokens, 1).value;
-    if (String(g.directed) === '1') throw new Error('directed graphs are not supported');
+    var directed = String(g.directed) === '1';
     var meta = { name: g.label || '', description: g.comment || '' };
     var nodes = [], idToIdx = {};
     asArray(g.node).forEach(function (nd, idx) {
@@ -823,12 +996,18 @@
       var s = String(e.source), t = String(e.target);
       if (s === t) return; // self-loop
       if (idToIdx[s] === undefined || idToIdx[t] === undefined) return; // dangling edge
-      var key = s < t ? s + '__' + t : t + '__' + s;
+      var ed = String(e.directed);
+      if (ed === '1' || ed === '0') {
+        if ((ed === '1') !== directed) throw new Error('mixed directed/undirected edges are not supported');
+      }
+      // In directed mode the two directions are distinct edges; only parallel
+      // edges in the same direction are deduplicated.
+      var key = directed ? s + '__' + t : (s < t ? s + '__' + t : t + '__' + s);
       if (seen.has(key)) return; // parallel edges -> keep one
       seen.add(key);
       edges.push({ source: s, target: t, weight: e.weight !== undefined ? Number(e.weight) : undefined });
     });
-    return { meta: meta, nodes: nodes, edges: edges };
+    return { meta: meta, directed: directed, nodes: nodes, edges: edges };
   }
 
   // ---- GraphML (XML with typed attributes) ----
@@ -854,7 +1033,7 @@
     }
     var graphEl = doc.getElementsByTagName('graph')[0];
     if (!graphEl) throw new Error('GraphML: no <graph> element');
-    if (graphEl.getAttribute('edgedefault') === 'directed') throw new Error('directed graphs are not supported');
+    var directed = graphEl.getAttribute('edgedefault') === 'directed';
 
     var meta = {
       name: dataAttr(graphEl, 'name', keys) || '',
@@ -883,18 +1062,22 @@
     var edges = [], seen = new Set();
     var edgeEls = doc.getElementsByTagName('edge');
     for (var b = 0; b < edgeEls.length; b++) {
-      if (edgeEls[b].getAttribute('directed') === 'true') throw new Error('directed graphs are not supported');
       var s = edgeEls[b].getAttribute('source');
       var t = edgeEls[b].getAttribute('target');
+      var edgeDirected = edgeEls[b].getAttribute('directed');
+      if (edgeDirected === 'true' || edgeDirected === 'false') {
+        if ((edgeDirected === 'true') !== directed) throw new Error('mixed directed/undirected edges are not supported');
+      }
       if (s === t) continue; // self-loop
       if (!nodeIds.has(s) || !nodeIds.has(t)) continue; // dangling edge
-      var ek = s < t ? s + '__' + t : t + '__' + s;
+      // In directed mode the two directions are distinct edges.
+      var ek = directed ? s + '__' + t : (s < t ? s + '__' + t : t + '__' + s);
       if (seen.has(ek)) continue; // parallel edges -> keep one
       seen.add(ek);
       var ew = dataAttr(edgeEls[b], 'weight', keys);
       edges.push({ source: s, target: t, weight: ew !== undefined ? Number(ew) : undefined });
     }
-    return { meta: meta, nodes: nodes, edges: edges };
+    return { meta: meta, directed: directed, nodes: nodes, edges: edges };
   }
 
   function parseGraphFile(text) {
@@ -916,7 +1099,8 @@
         graph = normalize(parsed);
         rebuild();
         setMessage('Loaded "' + (graph.meta.name || '(unnamed)') + '" (' +
-          graph.nodes.length + ' nodes, ' + graph.edges.length + ' edges).');
+          graph.nodes.length + ' nodes, ' + graph.edges.length + ' edges, ' +
+          (graph.directed ? 'directed' : 'undirected') + ').');
       } catch (err) {
         setMessage('Failed to load: ' + err.message, true);
       }
@@ -965,7 +1149,7 @@
   // GML: compact plain-text, read by igraph / NetworkX / Gephi / yEd.
   function toGML() {
     var l = ['graph ['];
-    l.push('  directed 0');
+    l.push('  directed ' + (graph.directed ? '1' : '0'));
     l.push('  id 0');
     if (graph.meta.name) l.push('  label "' + escapeQuoted(graph.meta.name) + '"');
     if (graph.meta.description) l.push('  comment "' + escapeQuoted(graph.meta.description) + '"');
@@ -1015,7 +1199,7 @@
       l.push('  <key id="d_y" for="node" attr.name="y" attr.type="double"/>');
     }
     l.push('  <key id="d_weight" for="edge" attr.name="weight" attr.type="double"/>');
-    l.push('  <graph id="G" edgedefault="undirected">');
+    l.push('  <graph id="G" edgedefault="' + (graph.directed ? 'directed' : 'undirected') + '">');
     l.push('    <data key="d_name">' + escapeXml(graph.meta.name) + '</data>');
     l.push('    <data key="d_desc">' + escapeXml(graph.meta.description) + '</data>');
     graph.nodes.forEach(function (n) {
@@ -1041,7 +1225,7 @@
 
   // DOT: Graphviz graph description language, handy for rendering.
   function toDOT() {
-    var l = ['graph G {'];
+    var l = [graph.directed ? 'digraph G {' : 'graph G {'];
     if (graph.meta.name) l.push('  graph [label="' + escapeQuoted(graph.meta.name) + '"];');
     graph.nodes.forEach(function (n) {
       var attrs = [];
@@ -1054,7 +1238,7 @@
       l.push('  "' + escapeQuoted(n.id) + '"' + (attrs.length ? ' [' + attrs.join(', ') + ']' : '') + ';');
     });
     liveEdges().forEach(function (e) {
-      l.push('  "' + escapeQuoted(e.source) + '" -- "' + escapeQuoted(e.target) +
+      l.push('  "' + escapeQuoted(e.source) + '"' + (graph.directed ? ' -> ' : ' -- ') + '"' + escapeQuoted(e.target) +
         '" [weight=' + e.weight.toFixed(6) + '];');
     });
     l.push('}');
@@ -1096,12 +1280,6 @@
   }
 
   // ---------------------------------------------------------- context menu
-
-  function findEdgeByVisKey(key) {
-    return graph.edges.find(function (e) {
-      return e.source + '__' + e.target === key || e.target + '__' + e.source === key;
-    });
-  }
 
   function hideContextMenu() {
     document.getElementById('contextMenu').hidden = true;
@@ -1150,11 +1328,19 @@
   }
 
   function edgeContextMenu(key) {
-    var e = findEdgeByVisKey(key);
-    if (!e) return [];
+    var list = graph.edges.filter(function (e) { return matchesVisKey(e, key); });
+    if (list.length === 0) return [];
+    var multi = graph.directed && list.length > 1;
     return [
-      { label: 'Jump to in list', action: function () { highlightEdgeRows([key]); } },
-      { label: 'Delete edge', danger: true, action: function () { deleteEdge(e.source, e.target); } }
+      {
+        label: 'Jump to in list',
+        action: function () { highlightEdgeRows(edgeRowKeysForVisKeys([key])); }
+      },
+      {
+        label: multi ? 'Delete edge (both directions)' : 'Delete edge',
+        danger: true,
+        action: function () { deleteEdgesForVisKey(key); }
+      }
     ];
   }
 
@@ -1213,6 +1399,7 @@
     renderEdgeList();
     renderStats();
     updateLayoutButtons();
+    updateModeButton();
   }
 
   function setMessage(text, isError) {
@@ -1285,7 +1472,7 @@
   function syncHighlight() {
     setTimeout(function () {
       if (!network) return;
-      highlightEdgeRows(network.getSelectedEdges());
+      highlightEdgeRows(edgeRowKeysForVisKeys(network.getSelectedEdges()));
       highlightNodeRows(network.getSelectedNodes());
     }, 0);
   }
@@ -1384,9 +1571,11 @@
     document.getElementById('btnNew').addEventListener('click', function () {
       var n = parseInt(document.getElementById('nodeCount').value, 10);
       if (!isFinite(n) || n < 1) n = NUM_NODES;
-      graph = newCompleteGraph(n);
+      graph = newCompleteGraph(n, graph.directed);
       rebuild();
-      setMessage('New complete graph (' + n + ' nodes, ' + (n * (n - 1) / 2) + ' edges).');
+      var edgeCount = graph.directed ? n * (n - 1) : n * (n - 1) / 2;
+      setMessage('New complete graph (' + n + ' nodes, ' + edgeCount + ' edges, ' +
+        (graph.directed ? 'directed' : 'undirected') + ').');
     });
     document.getElementById('btnAddNode').addEventListener('click', toggleAddNodeMenu);
     var addNodeBtns = document.querySelectorAll('#addNodeMenu button');
@@ -1433,6 +1622,7 @@
       evt.target.value = '';
     });
     document.getElementById('btnConnect').addEventListener('click', toggleConnect);
+    document.getElementById('btnMode').addEventListener('click', toggleMode);
     document.getElementById('btnDeleteEdge').addEventListener('click', deleteSelectedEdges);
     document.getElementById('btnAutoLayout').addEventListener('click', runAutoLayout);
     document.getElementById('btnUndoLayout').addEventListener('click', undoLayout);
