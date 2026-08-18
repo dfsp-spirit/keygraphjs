@@ -47,6 +47,7 @@
   var connectMode = false;
   var connectSource = null;
   var showEdgeLabels = false;
+  var showNodeLabels = false;
   var highlightedEdgeKeys = new Set();  // vis edge ids ('source__target') highlighted in the list
   var highlightedNodeKeys = new Set();  // vis node ids highlighted in the node list
   var layoutSnapshot = null;  // {id, x, y}[] captured before auto-layout
@@ -277,7 +278,8 @@
     var c = groupColor(n.group);
     var out = {
       id: n.id,
-      label: n.label || n.id,
+      // With the "Vertex weights" toggle on, the weight is shown under the name.
+      label: showNodeLabels ? (n.label || n.id) + '\n' + Number(n.weight).toFixed(2) : (n.label || n.id),
       size: nodeSize(n.weight),
       title: 'weight ' + Number(n.weight).toFixed(2),
       color: { background: c, border: c, highlight: { background: c, border: c } }
@@ -1560,6 +1562,18 @@
     setMessage(showEdgeLabels ? 'Edge labels on.' : 'Edge labels off.');
   }
 
+  function toggleNodeLabels() {
+    showNodeLabels = !showNodeLabels;
+    var btn = document.getElementById('btnNodeLabels');
+    btn.textContent = 'Vertex weights: ' + (showNodeLabels ? 'on' : 'off');
+    btn.classList.toggle('active', showNodeLabels);
+    // Rebuild the node data so the label change always applies cleanly.
+    var nodes = network.body.data.nodes;
+    nodes.clear();
+    nodes.add(visNodes());
+    setMessage(showNodeLabels ? 'Vertex weight labels on.' : 'Vertex weight labels off.');
+  }
+
   function toggleConnect() {
     connectMode = !connectMode;
     connectSource = null;
@@ -1705,6 +1719,7 @@
     document.getElementById('btnAutoLayout').addEventListener('click', runAutoLayout);
     document.getElementById('btnUndoLayout').addEventListener('click', undoLayout);
     document.getElementById('btnEdgeLabels').addEventListener('click', toggleEdgeLabels);
+    document.getElementById('btnNodeLabels').addEventListener('click', toggleNodeLabels);
     document.getElementById('bulkSlider').addEventListener('input', function () {
       applyBulkWeight(Number(this.value));
     });

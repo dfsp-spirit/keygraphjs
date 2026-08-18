@@ -61,22 +61,34 @@ async function graphPoints(page) {
 }
 
 // Click along the a–b edge until a single edge (not a node) is selected.
-// Edges are drawn as smooth curves, so the straight midpoint occasionally misses.
+// Edges are drawn as smooth curves, so the straight midpoint occasionally
+// misses; only click points that vis-network reports as on an edge, probing a
+// small perpendicular neighborhood to catch the thin curve. (In a dense graph
+// a crossing edge is fine too — the count-based assertions don't care which.)
 async function clickEdge(page, a, b) {
-  const pts = await page.evaluate(([a, b]) => {
+  const candidates = await page.evaluate(([a, b]) => {
     const n = window.__graphEditor;
     const c = document.getElementById('network').getBoundingClientRect();
     const P = n.getPositions();
     const vp = (pt) => ({ x: pt.x + c.x, y: pt.y + c.y });
     const toDOM = (x, y) => vp(n.canvasToDOM({ x, y }));
     const out = [];
-    for (const t of [0.5, 0.4, 0.6, 0.3, 0.7, 0.45, 0.55]) {
-      out.push(toDOM(P[a].x + (P[b].x - P[a].x) * t, P[a].y + (P[b].y - P[a].y) * t));
+    const ts = [0.5, 0.45, 0.55, 0.4, 0.6, 0.35, 0.65, 0.3, 0.7, 0.25, 0.75];
+    for (const t of ts) {
+      const x = P[a].x + (P[b].x - P[a].x) * t;
+      const y = P[a].y + (P[b].y - P[a].y) * t;
+      for (const [dx, dy] of [[0, 0], [0, 4], [0, -4], [4, 0], [-4, 0]]) {
+        const d = n.canvasToDOM({ x: x + dx, y: y + dy });
+        if (!n.getNodeAt(d) && n.getEdgeAt(d)) {
+          const q = vp(d);
+          if (out.findIndex((o) => Math.abs(o.x - q.x) < 3 && Math.abs(o.y - q.y) < 3) < 0) out.push(q);
+        }
+      }
     }
     return out;
   }, [a, b]);
 
-  for (const pt of pts) {
+  for (const pt of candidates) {
     await page.mouse.click(pt.x, pt.y);
     await page.waitForTimeout(120);
     const ok = await page.evaluate(() => {
@@ -338,6 +350,8 @@ test('no console/page errors on load or during interactions', async ({ page }) =
   await settle(page);
   await page.click('#btnEdgeLabels');
   await page.click('#btnEdgeLabels');
+  await page.click('#btnNodeLabels');
+  await page.click('#btnNodeLabels');
   await page.click('#btnAddNode');
   await page.locator('#addNodeMenu button[data-mode="isolated"]').click();
 
@@ -1012,6 +1026,20 @@ for (const mode of ['undirected', 'directed']) {
       await page.waitForTimeout(300);
       const offAgain = await darkTextPixels(page);
       expect(offAgain).toBeLessThan(on * 0.7);
+    });
+
+    test('vertex weight labels toggle on and off', async ({ page }) => {
+      const nodeLabel = () => page.evaluate(() => window.__graphEditor.body.data.nodes.get('C1').label);
+      await expect(page.locator('#btnNodeLabels')).toHaveText('Vertex weights: off');
+      expect(await nodeLabel()).toBe('C1');
+
+      await page.click('#btnNodeLabels');
+      await expect(page.locator('#btnNodeLabels')).toHaveText('Vertex weights: on');
+      expect(await nodeLabel()).toBe('C1\n0.50'); // C1 is a leaf with weight 0.50
+
+      await page.click('#btnNodeLabels');
+      await expect(page.locator('#btnNodeLabels')).toHaveText('Vertex weights: off');
+      expect(await nodeLabel()).toBe('C1');
     });
 
     test('creates a new complete graph with N nodes', async ({ page }) => {

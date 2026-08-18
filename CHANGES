@@ -30,6 +30,8 @@ New feature: support for **directed graphs** (in addition to undirected ones).
   silently saved to localStorage (debounced 500 ms) and restored on the next
   visit — a refresh, tab close or crash no longer loses work; falls back to
   sessionStorage when localStorage is unavailable
+- new "Vertex weights" toggle (View toolbar): shows each node's weight value
+  below its name on the canvas, mirroring the existing edge-label toggle
 
 ### v0.1.0 -- Initial release
 
