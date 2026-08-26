@@ -79,6 +79,14 @@
     var communityA = ['C1', 'C2', 'C3'];
     var communityB = ['C4', 'C5', 'C6'];
     var hubs = ['C7', 'C8'];
+    // Hand-placed layout from A_B_hub_example.json (x/y on every node), so the
+    // example renders immediately in its intended arrangement without physics.
+    var POS = {
+      C1: { x: -601, y: -236 },  C2: { x: -601, y: -79 },
+      C3: { x: -451, y: -145 },  C4: { x: 254, y: -119 },
+      C5: { x: 402, y: -25 },    C6: { x: 406, y: -200 },
+      C7: { x: -116, y: -318 },  C8: { x: -117, y: 52 }
+    };
 
     var nodes = [];
     for (var i = 0; i < NUM_NODES; i++) {
@@ -86,7 +94,7 @@
       var group = communityA.indexOf(id) >= 0 ? 'A'
                 : communityB.indexOf(id) >= 0 ? 'B'
                 : 'hub';
-      nodes.push({ id: id, label: id, group: group, weight: nodeWeight(id) });
+      nodes.push({ id: id, label: id, group: group, weight: nodeWeight(id), x: POS[id].x, y: POS[id].y });
     }
 
     var edges = [];
