@@ -362,11 +362,17 @@
       (ex.directed ? 'directed' : 'undirected') + ')?\n' +
       'This removes the current graph (' + graph.nodes.length + ' nodes, ' +
       graph.edges.length + ' edges).';
-    if (!window.confirm(msg)) return;
-    graph = ex;
-    rebuild();
-    setMessage('Loaded example "' + ex.meta.name + '" (' + ex.nodes.length + ' nodes, ' +
-      ex.edges.length + ' edges).');
+    showConfirmDialog({
+      title: 'Replace graph',
+      message: msg,
+      okLabel: 'Replace'
+    }).then(function (ok) {
+      if (!ok) return;
+      graph = ex;
+      rebuild();
+      setMessage('Loaded example "' + ex.meta.name + '" (' + ex.nodes.length + ' nodes, ' +
+        ex.edges.length + ' edges).');
+    });
   }
 
   function toggleExampleMenu() {
@@ -505,11 +511,17 @@
     var msg = goDirected
       ? 'Switch to directed mode? Each undirected edge becomes two directed edges (weights are copied).'
       : 'Switch to undirected mode? Bidirectional pairs are merged into one edge (mean weight); lone directed edges are kept.';
-    if (!window.confirm(msg)) return;
-    if (goDirected) convertToDirected(); else convertToUndirected();
-    rebuild();
-    setMessage('Switched to ' + (graph.directed ? 'directed' : 'undirected') + ' mode (' +
-      graph.nodes.length + ' nodes, ' + graph.edges.length + ' edges).');
+    showConfirmDialog({
+      title: 'Switch mode',
+      message: msg,
+      okLabel: goDirected ? 'Switch to directed' : 'Switch to undirected'
+    }).then(function (ok) {
+      if (!ok) return;
+      if (goDirected) convertToDirected(); else convertToUndirected();
+      rebuild();
+      setMessage('Switched to ' + (graph.directed ? 'directed' : 'undirected') + ' mode (' +
+        graph.nodes.length + ' nodes, ' + graph.edges.length + ' edges).');
+    });
   }
 
   function updateModeButton() {
@@ -1729,6 +1741,39 @@
     el.setAttribute('role', isError ? 'alert' : 'status');
   }
 
+  // ------------------------------------------------------------------ confirm
+  // Replacement for window.confirm(): a small in-app dialog styled like the
+  // rest of the UI. The browser-native confirm() shows an ugly origin title on
+  // file:// pages and a "don't allow this site to prompt you again" checkbox we
+  // don't want. Resolves true on OK, false on Cancel / Escape.
+  var confirmLastFocus = null;
+
+  function showConfirmDialog(opts) {
+    document.getElementById('confirmTitle').textContent = opts.title;
+    document.getElementById('confirmBody').textContent = opts.message;
+    var ok = document.getElementById('confirmOk');
+    ok.textContent = opts.okLabel || 'OK';
+    ok.className = opts.danger ? 'danger' : 'primary';
+    confirmLastFocus = document.activeElement;
+    var overlay = document.getElementById('confirmOverlay');
+    overlay.hidden = false;
+    ok.focus();
+    return new Promise(function (resolve) {
+      overlay._confirmResolve = resolve;
+    });
+  }
+
+  function closeConfirmDialog(result) {
+    var overlay = document.getElementById('confirmOverlay');
+    if (overlay.hidden) return;
+    overlay.hidden = true;
+    var resolve = overlay._confirmResolve;
+    overlay._confirmResolve = null;
+    if (resolve) resolve(result);
+    if (confirmLastFocus && confirmLastFocus.focus) confirmLastFocus.focus();
+    confirmLastFocus = null;
+  }
+
   function getEdgeRow(key) {
     var rows = document.querySelectorAll('#edgeList .edge-row');
     for (var i = 0; i < rows.length; i++) {
@@ -1912,11 +1957,17 @@
         edgeCount + ' edges, ' + (graph.directed ? 'directed' : 'undirected') + ')?\n' +
         'This removes the current graph (' + graph.nodes.length + ' nodes, ' +
         graph.edges.length + ' edges).';
-      if (!window.confirm(msg)) return;
-      graph = newCompleteGraph(n, graph.directed);
-      rebuild();
-      setMessage('New complete graph (' + n + ' nodes, ' + edgeCount + ' edges, ' +
-        (graph.directed ? 'directed' : 'undirected') + ').');
+      showConfirmDialog({
+        title: 'New complete graph',
+        message: msg,
+        okLabel: 'Replace'
+      }).then(function (ok) {
+        if (!ok) return;
+        graph = newCompleteGraph(n, graph.directed);
+        rebuild();
+        setMessage('New complete graph (' + n + ' nodes, ' + edgeCount + ' edges, ' +
+          (graph.directed ? 'directed' : 'undirected') + ').');
+      });
     });
     document.getElementById('btnAddNode').addEventListener('click', toggleAddNodeMenu);
     var addNodeBtns = document.querySelectorAll('#addNodeMenu button');
@@ -1972,6 +2023,21 @@
     });
     window.addEventListener('scroll', hideContextMenu, true);
     window.addEventListener('resize', hideContextMenu);
+    document.getElementById('confirmOk').addEventListener('click', function () {
+      closeConfirmDialog(true);
+    });
+    document.getElementById('confirmCancel').addEventListener('click', function () {
+      closeConfirmDialog(false);
+    });
+    document.getElementById('confirmOverlay').addEventListener('keydown', function (evt) {
+      if (evt.key === 'Escape') { closeConfirmDialog(false); evt.preventDefault(); return; }
+      if (evt.key !== 'Tab') return;
+      // Keep focus cycling inside the dialog.
+      var buttons = this.querySelectorAll('button');
+      var first = buttons[0], last = buttons[buttons.length - 1];
+      if (evt.shiftKey && document.activeElement === first) { last.focus(); evt.preventDefault(); }
+      else if (!evt.shiftKey && document.activeElement === last) { first.focus(); evt.preventDefault(); }
+    });
     document.getElementById('fileInput').addEventListener('change', function (evt) {
       if (evt.target.files && evt.target.files[0]) loadFromFile(evt.target.files[0]);
       evt.target.value = '';

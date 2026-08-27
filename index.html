@@ -188,6 +188,55 @@
   .select-all-row { padding: 2px 4px; }
   .select-all-row .edge-label { color: var(--muted); }
   .empty { font-size: 12px; color: var(--muted); }
+  /* Confirmation dialog — replaces the browser-native confirm(), which on a
+     file:// page shows an ugly origin banner and a "don't prompt again" box. */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(15, 23, 42, 0.35);
+  }
+  .modal-overlay[hidden] { display: none; }
+  .modal {
+    width: 420px;
+    max-width: calc(100vw - 32px);
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18);
+    padding: 16px;
+  }
+  .modal-title {
+    margin: 0 0 8px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+  }
+  .modal-body {
+    margin: 0 0 16px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text);
+    white-space: pre-line; /* keep the intentional line breaks in the message */
+  }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+  .modal-actions button.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+  .modal-actions button.primary:hover { background: #4338ca; }
+  .modal-actions button.danger {
+    background: var(--danger);
+    border-color: var(--danger);
+    color: #fff;
+  }
+  .modal-actions button.danger:hover { background: #b91c1c; }
 </style>
 </head>
 <body>
@@ -271,6 +320,16 @@
 <input type="file" id="fileInput" accept=".json,.graphml,.gml,application/json,application/xml,application/x-gml" hidden />
 <datalist id="groupOptions"></datalist>
 <div id="contextMenu" hidden></div>
+<div class="modal-overlay" id="confirmOverlay" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle" aria-describedby="confirmBody">
+    <h2 class="modal-title" id="confirmTitle">Confirm</h2>
+    <p class="modal-body" id="confirmBody"></p>
+    <div class="modal-actions">
+      <button type="button" id="confirmCancel">Cancel</button>
+      <button type="button" id="confirmOk" class="primary">OK</button>
+    </div>
+  </div>
+</div>
 <script src="vendor/vis-network.min.js"></script>
 <script src="src/app.js"></script>
 </body>

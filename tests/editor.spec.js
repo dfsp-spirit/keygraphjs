@@ -20,6 +20,15 @@ async function settle(page) {
   await page.waitForTimeout(1800);
 }
 
+// The app replaces the browser-native confirm() with an in-app dialog
+// (#confirmOverlay). These helpers accept / dismiss it.
+async function acceptConfirm(page) {
+  await page.locator('#confirmOk').click();
+}
+async function dismissConfirm(page) {
+  await page.locator('#confirmCancel').click();
+}
+
 // Count opaque dark pixels on the network canvas. Node labels are always drawn;
 // edge labels add a lot more dark text when the "Edge labels" toggle is on.
 async function darkTextPixels(page) {
@@ -115,8 +124,8 @@ test('loads the sample graph: 8 nodes, 28 edges', async ({ page }) => {
 test('loads a named example graph (Petersen) from the Example graphs menu', async ({ page }) => {
   await page.click('#btnExamples');
   await expect(page.locator('#exampleMenu')).toBeVisible();
-  page.on('dialog', (d) => d.accept());
   await page.locator('#exampleMenu button[data-example="petersen"]').click();
+  await acceptConfirm(page);
   await settle(page);
   await expect(page.locator('#nodeList .node-row')).toHaveCount(10);
   await expect(page.locator('#edgeList .edge-row')).toHaveCount(15);
@@ -126,8 +135,8 @@ test('loads a named example graph (Petersen) from the Example graphs menu', asyn
 
 test('cancelling an example load leaves the current graph untouched', async ({ page }) => {
   await page.click('#btnExamples');
-  page.on('dialog', (d) => d.dismiss());
   await page.locator('#exampleMenu button[data-example="tree"]').click();
+  await dismissConfirm(page);
   await settle(page);
   await expect(page.locator('#nodeList .node-row')).toHaveCount(8); // sample graph unchanged
   await expect(page.locator('#edgeList .edge-row')).toHaveCount(28);
@@ -135,8 +144,8 @@ test('cancelling an example load leaves the current graph untouched', async ({ p
 
 test('the DAG example loads in directed mode', async ({ page }) => {
   await page.click('#btnExamples');
-  page.on('dialog', (d) => d.accept());
   await page.locator('#exampleMenu button[data-example="dag"]').click();
+  await acceptConfirm(page);
   await settle(page);
   await expect(page.locator('#nodeList .node-row')).toHaveCount(7);
   await expect(page.locator('#edgeList .edge-row')).toHaveCount(9);
@@ -163,8 +172,8 @@ test('adds a fully connected node via the Add node menu', async ({ page }) => {
 
 test('creates a new complete graph with N nodes', async ({ page }) => {
   await page.fill('#nodeCount', '5');
-  page.on('dialog', (d) => d.accept());
   await page.click('#btnNew');
+  await acceptConfirm(page);
   await settle(page);
   await expect(page.locator('#nodeList .node-row')).toHaveCount(5);
   await expect(page.locator('#edgeList .edge-row')).toHaveCount(10);
@@ -172,8 +181,8 @@ test('creates a new complete graph with N nodes', async ({ page }) => {
 
 test('cancelling "New complete graph" leaves the current graph untouched', async ({ page }) => {
   await page.fill('#nodeCount', '3');
-  page.on('dialog', (d) => d.dismiss());
   await page.click('#btnNew');
+  await dismissConfirm(page);
   await settle(page);
   await expect(page.locator('#nodeList .node-row')).toHaveCount(8); // sample graph unchanged
   await expect(page.locator('#edgeList .edge-row')).toHaveCount(28);
@@ -580,6 +589,7 @@ test('loads a GML file', async ({ page }) => {
 // The destructive mode toggle asks for confirmation; accept it.
 async function toggleMode(page) {
   await page.click('#btnMode');
+  await acceptConfirm(page);
   await settle(page);
 }
 
@@ -587,7 +597,6 @@ test('switches to directed mode (edges doubled) and back (pairs merged with mean
   await expect(page.locator('#btnMode')).toHaveText('Mode: undirected');
   await expect(page.locator('#stats')).toContainText('undirected');
 
-  page.on('dialog', (d) => d.accept());
   await toggleMode(page);
 
   await expect(page.locator('#btnMode')).toHaveText('Mode: directed');
@@ -611,7 +620,6 @@ test('switches to directed mode (edges doubled) and back (pairs merged with mean
 });
 
 test('adds a fully connected node in directed mode (both directions)', async ({ page }) => {
-  page.on('dialog', (d) => d.accept());
   await toggleMode(page);
 
   await page.click('#btnAddNode');
@@ -622,7 +630,6 @@ test('adds a fully connected node in directed mode (both directions)', async ({ 
 });
 
 test('connect mode adds the missing direction of a pair', async ({ page }) => {
-  page.on('dialog', (d) => d.accept());
   await toggleMode(page);
 
   // Remove the C1 -> C2 direction only; C2 -> C1 must remain.
@@ -639,7 +646,6 @@ test('connect mode adds the missing direction of a pair', async ({ page }) => {
 });
 
 test('deletes both directions of a collapsed pair via the context menu', async ({ page }) => {
-  page.on('dialog', (d) => d.accept());
   await toggleMode(page);
 
   const pt = await page.evaluate(() => {
@@ -666,7 +672,6 @@ test('deletes both directions of a collapsed pair via the context menu', async (
 });
 
 test('exports a directed graph as GML, GraphML and DOT', async ({ page }) => {
-  page.on('dialog', (d) => d.accept());
   await toggleMode(page);
 
   const count = (text, needle) => text.split(needle).length - 1;
@@ -696,7 +701,6 @@ test('exports a directed graph as GML, GraphML and DOT', async ({ page }) => {
 });
 
 test('saves and reloads the directed flag in JSON', async ({ page }) => {
-  page.on('dialog', (d) => d.accept());
   await toggleMode(page);
 
   const [download] = await Promise.all([
@@ -838,8 +842,8 @@ async function setMode(page, mode) {
   const isDirected = label.includes('Mode: directed');
   const wantDirected = mode === 'directed';
   if (isDirected !== wantDirected) {
-    page.once('dialog', (d) => d.accept());
     await page.click('#btnMode');
+    await acceptConfirm(page);
     await settle(page);
   }
 }
@@ -1063,8 +1067,8 @@ for (const mode of ['undirected', 'directed']) {
 
     test('creates a new complete graph with N nodes', async ({ page }) => {
       await page.fill('#nodeCount', '5');
-      page.on('dialog', (d) => d.accept());
       await page.click('#btnNew');
+      await acceptConfirm(page);
       await settle(page);
       await expect(page.locator('#nodeList .node-row')).toHaveCount(5);
       const expected = isDirected ? 20 : 10;
@@ -1098,8 +1102,8 @@ for (const mode of ['undirected', 'directed']) {
 
 test.describe('mode switching', () => {
   test('undirected -> directed doubles edges and marks the graph directed', async ({ page }) => {
-    page.on('dialog', (d) => d.accept());
     await page.click('#btnMode');
+    await acceptConfirm(page);
     await settle(page);
     await expect(page.locator('#btnMode')).toHaveText('Mode: directed');
     await expect(page.locator('#stats')).toContainText('56 edges');
@@ -1110,14 +1114,15 @@ test.describe('mode switching', () => {
   });
 
   test('directed -> undirected merges pairs and keeps a lone directed edge', async ({ page }) => {
-    page.on('dialog', (d) => d.accept());
     await page.click('#btnMode'); // -> directed
+    await acceptConfirm(page);
     await settle(page);
     // remove one direction so C1-C2 becomes a lone directed edge (C2 -> C1)
     await page.locator('.edge-row[data-key="C1__C2"] .edge-del').click();
     await expect(page.locator('#edgeList .edge-row')).toHaveCount(55);
     // switch back
     await page.click('#btnMode'); // -> undirected
+    await acceptConfirm(page);
     await settle(page);
     await expect(page.locator('#btnMode')).toHaveText('Mode: undirected');
     await expect(page.locator('#stats')).toContainText('undirected');
@@ -1127,11 +1132,12 @@ test.describe('mode switching', () => {
   });
 
   test('a new complete graph inherits the current mode', async ({ page }) => {
-    page.on('dialog', (d) => d.accept());
     await page.click('#btnMode'); // -> directed
+    await acceptConfirm(page);
     await settle(page);
     await page.fill('#nodeCount', '4');
     await page.click('#btnNew');
+    await acceptConfirm(page);
     await settle(page);
     await expect(page.locator('#btnMode')).toHaveText('Mode: directed');
     await expect(page.locator('#stats')).toContainText('12 edges'); // complete directed 4*3
@@ -1178,8 +1184,8 @@ test('a loaded file is autosaved and restored on reload', async ({ page }) => {
 });
 
 test('directed mode is preserved in the autosaved draft', async ({ page }) => {
-  page.on('dialog', (d) => d.accept());
   await page.click('#btnMode'); // -> directed
+  await acceptConfirm(page);
   await settle(page);
   await expect(page.locator('#btnMode')).toHaveText('Mode: directed');
 

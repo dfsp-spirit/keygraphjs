@@ -43,6 +43,8 @@ Download [a release](https://dfsp-spirit.github.io/keygraphjs/releases) and unzi
 
 Then double-click the `index.html` file to open it with your favorite browser.
 
+If you prefer the terminal:
+
 
 ## Import & Export
 
