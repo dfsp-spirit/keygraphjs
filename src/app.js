@@ -13,6 +13,10 @@
  *
  * `nodes[].id`, `nodes[].weight`, `edges[].source/target/weight` carry the graph
  * data; `label` and `group` are human metadata; `x`/`y` are optional layout hints.
+ * Weights are general-purpose real numbers — any range, including negatives —
+ * and are stored/exported verbatim (no [0,1] clamping). New graphs default to
+ * weights in [0,1], and the display scale (node size, edge color, slider range)
+ * is derived from the current graph's own weight range.
  * In directed mode a bidirectional pair is stored as two edges (A->B and B->A)
  * and rendered as a single double-arrowed edge.
  */
@@ -392,10 +396,86 @@
 
   // -------------------------------------------------------------- normalization
 
-  function clampWeight(w) {
+  // Coerce a weight to a finite number. Weights are general-purpose real
+  // numbers (any range, including negatives); only non-numeric/missing values
+  // fall back to the default. There is deliberately NO [0,1] clamp here: an
+  // imported weight of 5 stays 5. The [0,1] convention is just the default
+  // scale for newly created graphs.
+  function toWeight(w) {
     var n = Number(w);
-    if (!isFinite(n)) n = DEFAULT_WEIGHT;
-    return Math.min(1, Math.max(0, n));
+    return isFinite(n) ? n : DEFAULT_WEIGHT;
+  }
+
+  // The display scale: min/max of every numeric weight in the graph. Used to
+  // map arbitrary raw weights onto a fixed visual range (node size, edge color)
+  // and to auto-range the weight sliders. Degenerates to [0,1] when there are
+  // no weights or they are all equal.
+  function weightRange() {
+    var min = Infinity, max = -Infinity, any = false;
+    graph.nodes.forEach(function (n) {
+      var w = Number(n.weight);
+      if (!isFinite(w)) return;
+      any = true;
+      if (w < min) min = w;
+      if (w > max) max = w;
+    });
+    graph.edges.forEach(function (e) {
+      var w = Number(e.weight);
+      if (!isFinite(w)) return;
+      any = true;
+      if (w < min) min = w;
+      if (w > max) max = w;
+    });
+    if (!any || min === max) return { min: 0, max: 1 };
+    return { min: min, max: max };
+  }
+
+  // Normalize a raw weight onto [0,1] against the graph's observed range.
+  function normWeight(w) {
+    var r = weightRange();
+    var n = toWeight(w);
+    if (r.max === r.min) return 0.5;
+    return (n - r.min) / (r.max - r.min);
+  }
+
+  // Compact, readable form of a weight for the sidebar number inputs.
+  function formatWeight(w) {
+    return String(Number(Number(w).toFixed(6)));
+  }
+
+  // Parse a weight typed into a number input: empty/whitespace is invalid (not
+  // silently 0), everything else is passed through Number().
+  function parseWeightInput(s) {
+    s = String(s).trim();
+    if (s === '') return NaN;
+    return Number(s);
+  }
+
+  // The display scale currently applied to the sliders and the vis rendering;
+  // kept in sync with what the last render used (see renderNodeList/renderEdgeList).
+  var lastWeightRange = null;
+
+  // Called after any weight edit. If the graph's overall weight range shifted,
+  // every slider's min/max and the whole visual mapping (node sizes, edge
+  // colors) must follow; otherwise a single-object update is enough. Returns
+  // true when a full re-sync happened, so the caller can skip its own update.
+  function noteWeightChanged() {
+    var r = weightRange();
+    if (lastWeightRange && lastWeightRange.min === r.min && lastWeightRange.max === r.max) return false;
+    lastWeightRange = r;
+    if (!network) return true;
+    // Re-range every weight slider in place (attribute-only, no DOM rebuild,
+    // so the focused number input keeps focus and the sidebar doesn't jump).
+    var sliders = document.querySelectorAll(
+      '#nodeList input[type="range"], #edgeList input[type="range"], #bulkSlider');
+    for (var i = 0; i < sliders.length; i++) {
+      sliders[i].min = r.min;
+      sliders[i].max = r.max;
+    }
+    // Re-push all vis objects so colors and sizes match the new scale.
+    network.body.data.nodes.update(visNodes());
+    network.body.data.edges.update(visEdges());
+    return true;
   }
 
   function normalize(parsed) {
@@ -404,7 +484,7 @@
         id: String(n.id),
         label: n.label !== undefined && n.label !== null ? String(n.label) : String(n.id),
         group: (n.group !== undefined && n.group !== null) ? String(n.group) : '',
-        weight: clampWeight(n.weight),
+        weight: toWeight(n.weight),
         x: (typeof n.x === 'number') ? n.x : undefined,
         y: (typeof n.y === 'number') ? n.y : undefined
       };
@@ -413,7 +493,7 @@
       return {
         source: String(e.source),
         target: String(e.target),
-        weight: clampWeight(e.weight)
+        weight: toWeight(e.weight)
       };
     });
     return {
@@ -500,7 +580,7 @@
       var sum = 0;
       ws.forEach(function (w) { sum += w; });
       var o = k.split('__');
-      edges.push({ source: o[0], target: o[1], weight: clampWeight(sum / ws.length) });
+      edges.push({ source: o[0], target: o[1], weight: toWeight(sum / ws.length) });
     });
     graph.edges = edges;
     graph.directed = false;
@@ -542,12 +622,12 @@
   }
 
   function edgeColor(w) {
-    // 0 -> red, 1 -> green. Lets structure show up at a glance.
-    return 'hsl(' + Math.round(140 * w) + ', 65%, 42%)';
+    // Low -> red, high -> green, relative to the graph's own weight range.
+    return 'hsl(' + Math.round(140 * normWeight(w)) + ', 65%, 42%)';
   }
 
   function nodeSize(w) {
-    return 12 + 22 * clampWeight(w); // heavier nodes draw larger
+    return 12 + 22 * normWeight(w); // heavier nodes draw larger
   }
 
   function visNodeObject(n) {
@@ -887,6 +967,7 @@
     var el = document.getElementById('nodeList');
     el.innerHTML = '';
     renderGroupDatalist();
+    lastWeightRange = weightRange(); // the scale this render applied
 
     graph.nodes.forEach(function (n) {
       var row = document.createElement('div');
@@ -930,37 +1011,55 @@
       del.setAttribute('aria-label', 'Remove node ' + n.id);
       del.addEventListener('click', function () { deleteNode(n.id); });
 
-      // line 2: vertex weight slider (mirrors the edge rows)
+      // line 2: vertex weight slider + precise number input (mirrors the edge
+      // rows). The slider is auto-ranged to the graph's observed weights; the
+      // number input is the escape hatch for precise or out-of-range values.
       var weightLine = document.createElement('div');
       weightLine.className = 'node-weight-line';
 
       var weightLabel = document.createElement('span');
       weightLabel.className = 'node-wlabel';
       weightLabel.textContent = 'w';
-      weightLabel.title = 'Vertex weight (0\u20131)';
+      weightLabel.title = 'Vertex weight';
 
       var weightSlider = document.createElement('input');
       weightSlider.type = 'range';
-      weightSlider.min = 0;
-      weightSlider.max = 1;
+      weightSlider.min = weightRange().min;
+      weightSlider.max = weightRange().max;
       weightSlider.step = 0.01;
       weightSlider.value = n.weight;
       weightSlider.setAttribute('aria-label', 'Weight of node ' + n.id);
 
-      var weightVal = document.createElement('span');
-      weightVal.className = 'node-val';
-      weightVal.textContent = Number(n.weight).toFixed(2);
+      var weightInput = document.createElement('input');
+      weightInput.type = 'number';
+      weightInput.inputMode = 'decimal';
+      weightInput.step = 'any';
+      weightInput.className = 'node-winput';
+      weightInput.value = formatWeight(n.weight);
+      weightInput.setAttribute('aria-label', 'Weight of node ' + n.id + ' (precise)');
 
-      weightSlider.addEventListener('input', function () {
-        n.weight = Number(weightSlider.value);
-        weightVal.textContent = n.weight.toFixed(2);
-        network.body.data.nodes.update(visNodeObject(n));
+      var commitNodeWeight = function (w) {
+        var nv = parseWeightInput(w);
+        if (!isFinite(nv)) { weightInput.value = formatWeight(n.weight); return; }
+        n.weight = nv;
+        var rangeChanged = noteWeightChanged();
+        weightSlider.value = nv;
+        weightInput.value = formatWeight(nv);
+        if (!rangeChanged) network.body.data.nodes.update(visNodeObject(n));
         autosave();
+      };
+      weightSlider.addEventListener('input', function () { commitNodeWeight(weightSlider.value); });
+      weightInput.addEventListener('change', function () { commitNodeWeight(weightInput.value); });
+      weightInput.addEventListener('blur', function () {
+        if (!isFinite(parseWeightInput(weightInput.value))) weightInput.value = formatWeight(n.weight);
+      });
+      weightInput.addEventListener('keydown', function (evt) {
+        if (evt.key === 'Escape') { weightInput.value = formatWeight(n.weight); weightInput.blur(); evt.preventDefault(); }
       });
 
       weightLine.appendChild(weightLabel);
       weightLine.appendChild(weightSlider);
-      weightLine.appendChild(weightVal);
+      weightLine.appendChild(weightInput);
 
       // line 3 (hidden): name + group editing — rare, so tucked away
       var editLine = document.createElement('div');
@@ -1039,6 +1138,7 @@
   function renderEdgeList() {
     var el = document.getElementById('edgeList');
     el.innerHTML = '';
+    lastWeightRange = weightRange(); // the scale this render applied
 
     if (graph.edges.length === 0) {
       var empty = document.createElement('div');
@@ -1076,21 +1176,37 @@
 
       var slider = document.createElement('input');
       slider.type = 'range';
-      slider.min = 0;
-      slider.max = 1;
+      slider.min = weightRange().min;
+      slider.max = weightRange().max;
       slider.step = 0.01;
       slider.value = e.weight;
       slider.setAttribute('aria-label', 'Weight of edge ' + edgeName);
 
-      var val = document.createElement('span');
-      val.className = 'edge-val';
-      val.textContent = Number(e.weight).toFixed(2);
+      var input = document.createElement('input');
+      input.type = 'number';
+      input.inputMode = 'decimal';
+      input.step = 'any';
+      input.className = 'edge-winput';
+      input.value = formatWeight(e.weight);
+      input.setAttribute('aria-label', 'Weight of edge ' + edgeName + ' (precise)');
 
-      slider.addEventListener('input', function () {
-        e.weight = Number(slider.value);
-        val.textContent = e.weight.toFixed(2);
-        network.body.data.edges.update(edgeVisObject(e));
+      var commitEdgeWeight = function (w) {
+        var nv = parseWeightInput(w);
+        if (!isFinite(nv)) { input.value = formatWeight(e.weight); return; }
+        e.weight = nv;
+        var rangeChanged = noteWeightChanged();
+        slider.value = nv;
+        input.value = formatWeight(nv);
+        if (!rangeChanged) network.body.data.edges.update(edgeVisObject(e));
         autosave();
+      };
+      slider.addEventListener('input', function () { commitEdgeWeight(slider.value); });
+      input.addEventListener('change', function () { commitEdgeWeight(input.value); });
+      input.addEventListener('blur', function () {
+        if (!isFinite(parseWeightInput(input.value))) input.value = formatWeight(e.weight);
+      });
+      input.addEventListener('keydown', function (evt) {
+        if (evt.key === 'Escape') { input.value = formatWeight(e.weight); input.blur(); evt.preventDefault(); }
       });
 
       var del = document.createElement('button');
@@ -1103,7 +1219,7 @@
       row.appendChild(cb);
       row.appendChild(lbl);
       row.appendChild(slider);
-      row.appendChild(val);
+      row.appendChild(input);
       row.appendChild(del);
       el.appendChild(row);
     });
@@ -1128,32 +1244,39 @@
     if (count === 0) { bar.hidden = true; return; }
     bar.hidden = false;
     document.getElementById('bulkCount').textContent = count + ' selected';
+    var slider = document.getElementById('bulkSlider');
+    slider.min = weightRange().min;
+    slider.max = weightRange().max;
+    var input = document.getElementById('bulkInput');
     var first = null, uniform = true;
     bulkSelected.forEach(function (e) {
       if (first === null) first = e.weight;
       else if (e.weight !== first) uniform = false;
     });
     if (uniform && first !== null) {
-      document.getElementById('bulkSlider').value = first;
-      document.getElementById('bulkVal').textContent = Number(first).toFixed(2);
+      slider.value = first;
+      input.value = formatWeight(first);
     } else {
-      document.getElementById('bulkVal').textContent = '\u2014';
+      input.value = ''; // mixed selection -> the placeholder dash is shown
     }
   }
 
   function applyBulkWeight(value) {
+    var nv = parseWeightInput(value);
+    if (!isFinite(nv)) { updateBulkBar(); return; }
+    bulkSelected.forEach(function (e) { e.weight = nv; });
+    var rangeChanged = noteWeightChanged();
     bulkSelected.forEach(function (e) {
-      e.weight = value;
-      network.body.data.edges.update(edgeVisObject(e));
+      if (!rangeChanged) network.body.data.edges.update(edgeVisObject(e));
       var row = getEdgeRow(e.source + '__' + e.target);
       if (row) {
         var s = row.querySelector('input[type="range"]');
-        var v = row.querySelector('.edge-val');
-        if (s) s.value = value;
-        if (v) v.textContent = Number(value).toFixed(2);
+        var w = row.querySelector('.edge-winput');
+        if (s) s.value = nv;
+        if (w) w.value = formatWeight(nv);
       }
     });
-    document.getElementById('bulkVal').textContent = Number(value).toFixed(2);
+    document.getElementById('bulkInput').value = formatWeight(nv);
     autosave();
   }
 
@@ -2049,7 +2172,13 @@
     document.getElementById('btnEdgeLabels').addEventListener('click', toggleEdgeLabels);
     document.getElementById('btnNodeLabels').addEventListener('click', toggleNodeLabels);
     document.getElementById('bulkSlider').addEventListener('input', function () {
-      applyBulkWeight(Number(this.value));
+      applyBulkWeight(this.value);
+    });
+    document.getElementById('bulkInput').addEventListener('change', function () {
+      applyBulkWeight(this.value);
+    });
+    document.getElementById('bulkInput').addEventListener('keydown', function (evt) {
+      if (evt.key === 'Escape') { this.value = ''; this.blur(); evt.preventDefault(); }
     });
     document.getElementById('btnBulkClear').addEventListener('click', clearBulkSelection);
     document.getElementById('selectAllEdges').addEventListener('change', function () {

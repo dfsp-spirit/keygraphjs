@@ -167,7 +167,18 @@
   .node-row .node-weight-line { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
   .node-row .node-wlabel { font-size: 11px; color: var(--muted); flex: 0 0 auto; }
   .node-row input[type="range"] { flex: 1 1 auto; min-width: 0; }
-  .node-row .node-val { flex: 0 0 36px; font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+  .node-row .node-winput {
+    flex: 0 0 68px;
+    width: 68px;
+    padding: 3px 6px;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    font-size: 12px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+    background: #fff;
+  }
   .node-row .node-edit-line { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
   .node-row .node-edit-line[hidden] { display: none; }
   .node-row .node-edit-line input[type="text"] { flex: 1 1 auto; min-width: 0; padding: 4px 6px; border: 1px solid var(--border); border-radius: 5px; font-size: 12px; }
@@ -176,14 +187,37 @@
   .edge-row.selected { background: #eef2ff; outline: 1px solid var(--accent); }
   .edge-row .edge-label { flex: 0 0 92px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .edge-row input[type="range"] { flex: 1 1 auto; min-width: 0; }
-  .edge-row .edge-val { flex: 0 0 36px; font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+  .edge-row .edge-winput {
+    flex: 0 0 68px;
+    width: 68px;
+    padding: 3px 6px;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    font-size: 12px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+    background: #fff;
+  }
   .edge-row .edge-del { padding: 2px 6px; font-size: 12px; color: var(--danger); border-color: var(--border); background: #fff; }
   .edge-row .edge-del:hover { background: #fef2f2; }
   .edge-row input[type="checkbox"] { flex: 0 0 14px; margin: 0; }
   .bulk-bar { display: flex; align-items: center; gap: 6px; margin: 8px 0 4px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 5px; background: #f8fafc; }
   .bulk-bar[hidden] { display: none; }
   .bulk-bar .bulk-count { flex: 0 0 auto; font-size: 12px; color: var(--muted); }
-  .bulk-bar input[type="range"] { flex: 1 1 auto; min-width: 0; }
+  .bulk-bar .bulk-winput {
+    flex: 0 0 68px;
+    width: 68px;
+    padding: 3px 6px;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    font-size: 12px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+    background: #fff;
+  }
+  .bulk-bar .bulk-winput::placeholder { color: var(--muted); }
   .bulk-bar button { padding: 2px 6px; font-size: 12px; }
   .select-all-row { padding: 2px 4px; }
   .select-all-row .edge-label { color: var(--muted); }
@@ -303,11 +337,11 @@
     <div class="hint" id="message" role="status" aria-live="polite">Click two nodes with "Connect nodes" to add an edge. Click an edge to jump to it in the list. Drag nodes to arrange.</div>
     <h2>Nodes — name &amp; group</h2>
     <div id="nodeList"></div>
-    <h2>Edges — weight (0–1)</h2>
+    <h2>Edges — weight</h2>
     <div class="bulk-bar" id="bulkBar" hidden>
       <span class="bulk-count" id="bulkCount">0 selected</span>
       <input type="range" id="bulkSlider" min="0" max="1" step="0.01" title="Set all selected edges to this weight">
-      <span class="edge-val" id="bulkVal">0.50</span>
+      <input type="number" id="bulkInput" class="bulk-winput" inputmode="decimal" step="any" placeholder="—" title="Set all selected edges to this weight (precise value)" aria-label="Weight for all selected edges">
       <button id="btnBulkClear" title="Clear selection">Clear</button>
     </div>
     <div class="edge-row select-all-row">

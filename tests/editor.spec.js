@@ -215,7 +215,7 @@ test('bulk-selects edges and sets a shared weight', async ({ page }) => {
     el.dispatchEvent(new Event('input', { bubbles: true }));
   }, '0.42');
 
-  const vals = await page.locator('#edgeList .edge-row .edge-val').allTextContents();
+  const vals = await page.locator('#edgeList .edge-row .edge-winput').evaluateAll((els) => els.map((el) => el.value));
   expect(vals[0]).toBe('0.42');
   expect(vals[1]).toBe('0.42');
 
@@ -527,9 +527,10 @@ test('editing a node weight updates its value and draw size', async ({ page }) =
     el.value = v;
     el.dispatchEvent(new Event('input', { bubbles: true }));
   }, '0.77');
-  await expect(row.locator('.node-val')).toHaveText('0.77');
+  await expect(row.locator('.node-winput')).toHaveValue('0.77');
   const size = await page.evaluate(() => window.__graphEditor.body.data.nodes.get('C1').size);
-  expect(size).toBeCloseTo(12 + 22 * 0.77, 2);
+  // Node size maps the raw weight onto the graph's observed range (0.05..0.90).
+  expect(size).toBeCloseTo(12 + 22 * ((0.77 - 0.05) / (0.90 - 0.05)), 2);
 });
 
 test('the sidebar can be resized with the drag handle', async ({ page }) => {
@@ -582,6 +583,65 @@ test('loads a GML file', async ({ page }) => {
   await expect(page.locator('#nodeList .node-row').first().locator('.node-name')).toHaveText('C1');
 });
 
+test('keeps out-of-range weights (5, -1, 500) verbatim and auto-ranges the sliders', async ({ page }) => {
+  const json = {
+    meta: { name: 'out-of-range' }, directed: false,
+    nodes: [
+      { id: 'A', weight: 0.5 },
+      { id: 'B', weight: 5 },
+      { id: 'C', weight: -1 }
+    ],
+    edges: [
+      { source: 'A', target: 'B', weight: 5 },
+      { source: 'B', target: 'C', weight: 0.3 },
+      { source: 'A', target: 'C', weight: 500 }
+    ]
+  };
+  const [chooser] = await Promise.all([
+    page.waitForEvent('filechooser'),
+    page.click('#btnLoad'),
+  ]);
+  await chooser.setFiles({ name: 'wide.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(json)) });
+  await settle(page);
+
+  // No clamping: the precise inputs show the raw values.
+  await expect(page.locator('.node-row[data-id="B"] .node-winput')).toHaveValue('5');
+  await expect(page.locator('.node-row[data-id="C"] .node-winput')).toHaveValue('-1');
+  await expect(page.locator('.edge-row[data-key="A__C"] .edge-winput')).toHaveValue('500');
+
+  // Sliders auto-range to the graph's observed weight range (min..max).
+  const sliderRange = await page.locator('.edge-row[data-key="A__C"] input[type="range"]').evaluate((el) => [el.min, el.max]);
+  expect(sliderRange).toEqual(['-1', '500']);
+
+  // A precise value typed into the number input commits and syncs the slider.
+  const input = page.locator('.edge-row[data-key="A__B"] .edge-winput');
+  await input.fill('12.34');
+  await input.blur();
+  await expect(input).toHaveValue('12.34');
+  await expect(page.locator('.edge-row[data-key="A__B"] input[type="range"]')).toHaveValue('12.34');
+
+  // Auto-sync: typing beyond the current max re-ranges every slider in place
+  // (no manual refresh needed) and the committed slider follows immediately.
+  await input.fill('9999');
+  await input.blur();
+  await expect(input).toHaveValue('9999');
+  await expect(page.locator('.edge-row[data-key="A__B"] input[type="range"]')).toHaveValue('9999');
+  const newMax = await page.locator('.edge-row[data-key="A__C"] input[type="range"]').evaluate((el) => el.max);
+  expect(newMax).toBe('9999');
+
+  // Export keeps the raw values (weight=… serialized with full precision).
+  await page.click('#btnExport');
+  const [dl] = await Promise.all([
+    page.waitForEvent('download'),
+    page.click('#exportMenu button[data-format="gml"]'),
+  ]);
+  const gml = fs.readFileSync(await dl.path(), 'utf8');
+  expect(gml).toContain('weight 5.000000');
+  expect(gml).toContain('weight -1.000000');
+  expect(gml).toContain('weight 500.000000');
+  expect(gml).toContain('weight 9999.000000');
+});
+
 // ---------------------------------------------------------------------------
 // Directed-graph mode
 // ---------------------------------------------------------------------------
@@ -611,12 +671,12 @@ test('switches to directed mode (edges doubled) and back (pairs merged with mean
     el.value = v;
     el.dispatchEvent(new Event('input', { bubbles: true }));
   }, '0.30');
-  await expect(page.locator('.edge-row[data-key="C1__C2"] .edge-val')).toHaveText('0.30');
+  await expect(page.locator('.edge-row[data-key="C1__C2"] .edge-winput')).toHaveValue('0.3');
 
   await toggleMode(page); // directed -> undirected
   await expect(page.locator('#btnMode')).toHaveText('Mode: undirected');
   await expect(page.locator('#edgeList .edge-row')).toHaveCount(28);
-  await expect(page.locator('.edge-row[data-key="C1__C2"] .edge-val')).toHaveText('0.60'); // (0.90 + 0.30) / 2
+  await expect(page.locator('.edge-row[data-key="C1__C2"] .edge-winput')).toHaveValue('0.6'); // (0.90 + 0.30) / 2
 });
 
 test('adds a fully connected node in directed mode (both directions)', async ({ page }) => {
@@ -765,8 +825,8 @@ test('loads a directed GraphML file', async ({ page }) => {
   await settle(page);
   await expect(page.locator('#btnMode')).toHaveText('Mode: directed');
   await expect(page.locator('#edgeList .edge-row')).toHaveCount(2);
-  await expect(page.locator('.edge-row[data-key="A__B"] .edge-val')).toHaveText('0.40');
-  await expect(page.locator('.edge-row[data-key="B__A"] .edge-val')).toHaveText('0.90');
+  await expect(page.locator('.edge-row[data-key="A__B"] .edge-winput')).toHaveValue('0.4');
+  await expect(page.locator('.edge-row[data-key="B__A"] .edge-winput')).toHaveValue('0.9');
 });
 
 test('rejects a mixed GraphML file (per-edge override of edgedefault)', async ({ page }) => {
@@ -937,9 +997,10 @@ for (const mode of ['undirected', 'directed']) {
         el.value = v;
         el.dispatchEvent(new Event('input', { bubbles: true }));
       }, '0.77');
-      await expect(row.locator('.node-val')).toHaveText('0.77');
+      await expect(row.locator('.node-winput')).toHaveValue('0.77');
       const size = await page.evaluate(() => window.__graphEditor.body.data.nodes.get('C1').size);
-      expect(size).toBeCloseTo(12 + 22 * 0.77, 2);
+      // Node size maps the raw weight onto the graph's observed range (0.05..0.90).
+      expect(size).toBeCloseTo(12 + 22 * ((0.77 - 0.05) / (0.90 - 0.05)), 2);
     });
 
     test('edits an edge weight via the sidebar slider', async ({ page }) => {
@@ -948,7 +1009,7 @@ for (const mode of ['undirected', 'directed']) {
         el.value = v;
         el.dispatchEvent(new Event('input', { bubbles: true }));
       }, '0.42');
-      await expect(row.locator('.edge-val')).toHaveText('0.42');
+      await expect(row.locator('.edge-winput')).toHaveValue('0.42');
     });
 
     test('bulk-selects edges and sets a shared weight', async ({ page }) => {
@@ -961,7 +1022,7 @@ for (const mode of ['undirected', 'directed']) {
         el.value = v;
         el.dispatchEvent(new Event('input', { bubbles: true }));
       }, '0.42');
-      const vals = await page.locator('#edgeList .edge-row .edge-val').allTextContents();
+      const vals = await page.locator('#edgeList .edge-row .edge-winput').evaluateAll((els) => els.map((el) => el.value));
       expect(vals[0]).toBe('0.42');
       expect(vals[1]).toBe('0.42');
       await page.click('#btnBulkClear');
@@ -1128,7 +1189,7 @@ test.describe('mode switching', () => {
     await expect(page.locator('#stats')).toContainText('undirected');
     // the lone C2 -> C1 became one undirected C1-C2 edge; all other pairs merged
     await expect(page.locator('#edgeList .edge-row')).toHaveCount(28);
-    await expect(page.locator('.edge-row[data-key="C1__C2"] .edge-val')).toHaveText('0.90');
+    await expect(page.locator('.edge-row[data-key="C1__C2"] .edge-winput')).toHaveValue('0.9');
   });
 
   test('a new complete graph inherits the current mode', async ({ page }) => {

@@ -18,8 +18,9 @@ Keygraph.js lets you:
   (destructive, with confirmation); the mode is stored in the JSON and shown in the stats,
 - drag nodes and run a one-shot force-directed **auto-layout** (with undo),
 - add and remove nodes, and connect nodes to add edges,
-- edit edge **weights** (0–1) per edge, or select several and set them all at once,
-- set a **node weight** (0–1) per node — heavier nodes draw larger and export with the weight,
+- edit edge **weights** per edge — any real value (new graphs default to 0–1),
+  via a slider plus a precise number input, or select several and set them all at once,
+- set a **node weight** per node — heavier nodes draw larger and export with the weight,
 - give nodes human-readable **names** and arbitrary **groups** (colors are assigned automatically),
 - toggle edge-weight labels in the view, and
 - **load and save** graphs in JSON or standard formats (GML, GraphML) via the
