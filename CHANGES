@@ -1,9 +1,11 @@
 ## keygraphjs Changelog
 
 
-Current WIP
------------
-
+v0.3.0 -- Arbitrary weights and example graphs
+----------------------------------------------------
+- Add support for edges / vertex weights in arbitrary range, no longer limited
+  to [0, 1]
+- Add number input for precise weight value input (in addition to sliders)
 - **in-app confirmation dialog** replaces the browser-native `confirm()` for the
   destructive actions (like "New complete graph"). The
   new dialog is a small modal styled like the rest of the UI (Enter confirms,
@@ -18,9 +20,6 @@ Current WIP
   app into directed mode
 - the startup sample graph is renamed to **"Two Hubs"** (was "A/B hub example")
   and is now also reachable from the Example graphs menu
-- Add support for edges / vertex weights in arbitrary range, no longer limited
-  to [0, 1]
-- Add number input for precise weight value input (in addition to sliders)
 
 v0.2.0 -- Directed graph support
 ----------------------------------
@@ -58,6 +57,7 @@ New feature: support for **directed graphs** (in addition to undirected ones).
   via the right-click context menu or the sidebar ✕ (the button was redundant,
   asymmetric with nodes, and could delete all incident edges when a node was
   selected, since clicking a node selects its edges)
+
 
 v0.1.0 -- Initial release
 --------------------------
