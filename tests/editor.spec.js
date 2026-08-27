@@ -153,6 +153,27 @@ test('the DAG example loads in directed mode', async ({ page }) => {
   await expect(page.locator('#btnMode')).toHaveText('Mode: directed');
 });
 
+test('the directed textbook examples load in directed mode', async ({ page }) => {
+  const cases = [
+    { id: 'dijkstra', nodes: 5, edges: 10, name: 'Dijkstra graph' },
+    { id: 'scc', nodes: 8, edges: 14, name: 'SCC graph' },
+    { id: 'flow', nodes: 6, edges: 9, name: 'Max-flow network' },
+    { id: 'tournament', nodes: 5, edges: 10, name: 'Tournament (T5)' },
+    { id: 'debruijn', nodes: 4, edges: 8, name: 'De Bruijn graph B(2,2)' }
+  ];
+  for (const c of cases) {
+    await page.click('#btnExamples');
+    await page.locator('#exampleMenu button[data-example="' + c.id + '"]').click();
+    await acceptConfirm(page);
+    await settle(page);
+    await expect(page.locator('#nodeList .node-row')).toHaveCount(c.nodes);
+    await expect(page.locator('#edgeList .edge-row')).toHaveCount(c.edges);
+    await expect(page.locator('#stats')).toContainText('directed');
+    await expect(page.locator('#btnMode')).toHaveText('Mode: directed');
+    await expect(page.locator('#graphName')).toHaveValue(c.name);
+  }
+});
+
 test('adds an isolated node via the Add node menu', async ({ page }) => {
   await page.click('#btnAddNode');
   await page.locator('#addNodeMenu button[data-mode="isolated"]').click();

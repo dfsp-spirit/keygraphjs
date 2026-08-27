@@ -5,19 +5,22 @@ Current WIP
 -----------
 
 - **in-app confirmation dialog** replaces the browser-native `confirm()` for the
-  destructive actions ("New complete graph", the Example graphs menu, and the
-  directed/undirected mode toggle). The native dialog showed an ugly `file://`
-  origin banner and a "don't allow this site to prompt you again" checkbox; the
+  destructive actions (like "New complete graph"). The
   new dialog is a small modal styled like the rest of the UI (Enter confirms,
   Escape cancels, focus is trapped inside while open)
-- new **"Example graphs…"** toolbar dropdown with well-known preset graphs. Each
-  one replaces the current graph after a confirmation and renders with a
-  hand-placed or generated layout: **Two Hubs** (the startup sample), Petersen
-  graph, K3,3 (utility), Krackhardt kite, hypercube Q3, star (S8), cycle (C8),
-  balanced binary tree, 4×4 grid, and a small directed DAG (the only directed
-  example — it switches the app into directed mode)
+- new **"Example graphs…"** toolbar dropdown with well-known preset graphs.
+  The undirected ones: Two Hubs, Petersen, K3,3, Krackhardt kite, hypercube Q3,
+  star (S8), cycle (C8), binary tree, 4×4 grid. A **Directed** section adds:
+  DAG, Dijkstra's weighted shortest-path graph (CLRS Fig 24.6), the strongly-
+  connected-components graph (CLRS Fig 22.9, includes a self-loop), a max-flow
+  network (CLRS Fig 26.1), a regular tournament (T5), and the binary de Bruijn
+  graph B(2,2) (includes two self-loops). Each directed example switches the
+  app into directed mode
 - the startup sample graph is renamed to **"Two Hubs"** (was "A/B hub example")
   and is now also reachable from the Example graphs menu
+- Add support for edges / vertex weights in arbitrary range, no longer limited
+  to [0, 1]
+- Add number input for precise weight value input (in addition to sliders)
 
 v0.2.0 -- Directed graph support
 ----------------------------------

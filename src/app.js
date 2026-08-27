@@ -158,6 +158,15 @@
     return { source: nodeId(i), target: nodeId(j), weight: weight !== undefined ? weight : DEFAULT_WEIGHT };
   }
 
+  // Like exNode but with a custom visible label (the id stays "C(i+1)" so
+  // exEdge can still reference it). Used by the directed examples that carry
+  // textbook names (s/t/x/y/z, 00/01/10/11, a–h, …).
+  function exNamedNode(i, label, opts) {
+    var n = exNode(i, opts);
+    n.label = label;
+    return n;
+  }
+
   // n nodes evenly spaced on a circle of the given radius.
   function circleNodes(n, radius) {
     var nodes = [];
@@ -343,6 +352,124 @@
     };
   }
 
+  // Dijkstra's classic weighted digraph (CLRS Fig 24.6): 5 vertices, 10
+  // weighted edges. The canonical example for single-source shortest paths.
+  function dijkstraGraph() {
+    var LABELS = ['s', 't', 'x', 'y', 'z'];
+    var POS = [
+      { x: -200, y: -130 }, // s
+      { x: 0, y: 0 },       // t
+      { x: 200, y: 130 },   // x
+      { x: 200, y: -130 },  // y
+      { x: -200, y: 130 }   // z
+    ];
+    var nodes = [];
+    for (var i = 0; i < 5; i++) nodes.push(exNamedNode(i, LABELS[i], POS[i]));
+    var edges = [
+      [0, 1, 10], [0, 3, 5], [1, 2, 1], [1, 3, 2], [2, 4, 4],
+      [3, 1, 3], [3, 2, 9], [3, 4, 2], [4, 0, 7], [4, 2, 6]
+    ].map(function (e) { return exEdge(e[0], e[1], e[2]); });
+    return {
+      meta: { name: 'Dijkstra graph', description: 'The classic weighted digraph for shortest paths (CLRS Fig 24.6): 5 nodes, 10 weighted edges.' },
+      directed: true, nodes: nodes, edges: edges
+    };
+  }
+
+  // The strongly-connected-components example from CLRS Fig 22.9: 8 vertices,
+  // SCCs {a,b,e}, {c,d}, {f,g} and singleton {h} (which carries a self-loop).
+  // The standard demo for strong connectivity and condensation.
+  function sccGraph() {
+    var LABELS = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+    var POS = [
+      { x: -170, y: -150 }, // a
+      { x: 170, y: -150 },  // b
+      { x: 170, y: 60 },    // c
+      { x: -170, y: 150 },  // d
+      { x: -170, y: -40 },  // e
+      { x: 170, y: -40 },   // f
+      { x: -170, y: 60 },   // g
+      { x: 170, y: 150 }    // h
+    ];
+    var nodes = [];
+    for (var i = 0; i < 8; i++) nodes.push(exNamedNode(i, LABELS[i], POS[i]));
+    var pairs = [
+      [0, 1], [0, 4], [1, 0], [1, 2], [2, 3], [2, 5],
+      [3, 2], [3, 7], [4, 0], [4, 5], [5, 6], [6, 5], [6, 7], [7, 7]
+    ];
+    var edges = pairs.map(function (p) { return exEdge(p[0], p[1]); });
+    return {
+      meta: { name: 'SCC graph', description: 'Strongly connected components demo (CLRS Fig 22.9): SCCs {a,b,e}, {c,d}, {f,g}, {h} (8 nodes, 14 edges).' },
+      directed: true, nodes: nodes, edges: edges
+    };
+  }
+
+  // The max-flow / min-cut network from CLRS Fig 26.1: source s, sink t and
+  // four intermediate vertices, with edge capacities (max flow = 23).
+  function flowGraph() {
+    var LABELS = ['s', 'v1', 'v2', 'v3', 'v4', 't'];
+    var POS = [
+      { x: -320, y: 0 },    // s
+      { x: -140, y: -180 }, // v1
+      { x: -140, y: 180 },  // v2
+      { x: 140, y: -180 },  // v3
+      { x: 140, y: 180 },   // v4
+      { x: 320, y: 0 }      // t
+    ];
+    var nodes = [];
+    for (var i = 0; i < 6; i++) nodes.push(exNamedNode(i, LABELS[i], POS[i]));
+    var edges = [
+      [0, 1, 16], [0, 2, 13], [1, 3, 12], [2, 1, 4], [2, 4, 14],
+      [3, 2, 9], [3, 5, 20], [4, 3, 7], [4, 5, 4]
+    ].map(function (e) { return exEdge(e[0], e[1], e[2]); });
+    return {
+      meta: { name: 'Max-flow network', description: 'Source s to sink t flow network (CLRS Fig 26.1): 6 nodes, 9 edges with capacities.' },
+      directed: true, nodes: nodes, edges: edges
+    };
+  }
+
+  // A regular tournament on 5 vertices: every pair has exactly one directed
+  // edge and each vertex has out-degree 2 (and in-degree 2). Strongly
+  // connected, with a directed Hamiltonian cycle.
+  function tournamentGraph() {
+    var nodes = [];
+    for (var i = 0; i < 5; i++) {
+      var ang = 2 * Math.PI * i / 5 - Math.PI / 2;
+      nodes.push(exNamedNode(i, String(i + 1), {
+        x: Math.round(220 * Math.cos(ang)), y: Math.round(220 * Math.sin(ang))
+      }));
+    }
+    var pairs = [
+      [0, 1], [0, 2], [1, 2], [1, 3], [2, 3],
+      [2, 4], [3, 4], [3, 0], [4, 0], [4, 1]
+    ];
+    var edges = pairs.map(function (p) { return exEdge(p[0], p[1]); });
+    return {
+      meta: { name: 'Tournament (T5)', description: 'A regular tournament: every pair has exactly one directed edge (5 nodes, 10 edges).' },
+      directed: true, nodes: nodes, edges: edges
+    };
+  }
+
+  // The binary de Bruijn graph B(2,2): 4 nodes (the length-2 words), 8 edges
+  // — each word has two successors (append 0/1, drop the first bit). The
+  // genome-assembly classic. Includes the two self-loops 00->00 and 11->11.
+  function debruijnGraph() {
+    var LABELS = ['00', '01', '10', '11'];
+    var POS = [
+      { x: -160, y: -160 }, // 00
+      { x: 160, y: -160 },  // 01
+      { x: -160, y: 160 },  // 10
+      { x: 160, y: 160 }    // 11
+    ];
+    var nodes = [];
+    for (var i = 0; i < 4; i++) nodes.push(exNamedNode(i, LABELS[i], POS[i]));
+    var pairs = [[0, 0], [0, 1], [1, 2], [1, 3], [2, 0], [2, 1], [3, 2], [3, 3]];
+    var edges = pairs.map(function (p) { return exEdge(p[0], p[1]); });
+    return {
+      meta: { name: 'De Bruijn graph B(2,2)', description: 'Binary de Bruijn graph: 4 words, 8 edges — each word has 2 successors (genome assembly).' },
+      directed: true, nodes: nodes, edges: edges
+    };
+  }
+
   // id -> builder for the "Example graphs…" dropdown buttons.
   var EXAMPLE_BUILDERS = {
     hubs: sampleGraph,
@@ -354,7 +481,12 @@
     cycle: cycleGraph,
     tree: treeGraph,
     grid: gridGraph,
-    dag: dagGraph
+    dag: dagGraph,
+    dijkstra: dijkstraGraph,
+    scc: sccGraph,
+    flow: flowGraph,
+    tournament: tournamentGraph,
+    debruijn: debruijnGraph
   };
 
   function loadExample(id) {
