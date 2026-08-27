@@ -105,7 +105,7 @@
       }
     }
     return {
-      meta: { name: 'A/B/hub example', description: 'Communities A and B, hubs C7/C8 (README weights).' },
+      meta: { name: 'Two Hubs', description: 'Communities A and B, hubs C7/C8 (README example graph).' },
       directed: false,
       nodes: nodes,
       edges: edges
@@ -126,6 +126,262 @@
       // stay unambiguous in exported files (edges: 0.90/0.65/0.35/0.05).
       return hubs.indexOf(id) >= 0 ? 0.75 : 0.50;
     }
+  }
+
+  // ----------------------------------------------------------------- example graphs
+
+  // Fixed "example graphs" offered by the "Example graphs…" dropdown. Each
+  // builder returns a full graph object, exactly like sampleGraph()/
+  // newCompleteGraph(). All of them carry x/y positions (hand-placed or
+  // generated) so the example renders immediately in its recognizable
+  // arrangement — see hasPositions().
+
+  // Node with id "C(i+1)" and optional group/weight/position.
+  function exNode(i, opts) {
+    opts = opts || {};
+    var n = {
+      id: nodeId(i),
+      label: nodeId(i),
+      group: opts.group !== undefined ? opts.group : '',
+      weight: opts.weight !== undefined ? opts.weight : DEFAULT_WEIGHT
+    };
+    if (typeof opts.x === 'number' && typeof opts.y === 'number') { n.x = opts.x; n.y = opts.y; }
+    return n;
+  }
+
+  // Undirected edge between the i-th and j-th node (ids "C(i+1)", "C(j+1)").
+  function exEdge(i, j, weight) {
+    return { source: nodeId(i), target: nodeId(j), weight: weight !== undefined ? weight : DEFAULT_WEIGHT };
+  }
+
+  // n nodes evenly spaced on a circle of the given radius.
+  function circleNodes(n, radius) {
+    var nodes = [];
+    for (var i = 0; i < n; i++) {
+      var ang = 2 * Math.PI * i / n - Math.PI / 2;
+      nodes.push(exNode(i, { x: Math.round(radius * Math.cos(ang)), y: Math.round(radius * Math.sin(ang)) }));
+    }
+    return nodes;
+  }
+
+  // Petersen graph: 3-regular, non-planar, no Hamiltonian cycle — the classic
+  // counterexample. Outer 5-cycle, inner pentagram, 5 spokes.
+  function petersenGraph() {
+    var nodes = [], edges = [], outer = [], inner = [];
+    for (var i = 0; i < 5; i++) {
+      var oa = Math.PI / 2 + 2 * Math.PI * i / 5;
+      var ia = oa + Math.PI / 5;
+      outer.push(exNode(i, { x: Math.round(215 * Math.cos(oa)), y: Math.round(215 * Math.sin(oa)) }));
+      inner.push(exNode(i + 5, { x: Math.round(95 * Math.cos(ia)), y: Math.round(95 * Math.sin(ia)) }));
+    }
+    nodes = outer.concat(inner);
+    for (var j = 0; j < 5; j++) edges.push(exEdge(j, (j + 1) % 5)); // outer 5-cycle
+    // inner pentagram: connect every second inner vertex
+    edges.push(exEdge(5, 7), exEdge(7, 9), exEdge(9, 6), exEdge(6, 8), exEdge(8, 5));
+    for (var k = 0; k < 5; k++) edges.push(exEdge(k, k + 5)); // spokes
+    return {
+      meta: { name: 'Petersen graph', description: '3-regular, non-planar; the classic counterexample (10 nodes, 15 edges).' },
+      directed: false, nodes: nodes, edges: edges
+    };
+  }
+
+  // K3,3 — the "three utilities" problem: a minimal non-planar graph.
+  function k33Graph() {
+    var nodes = [], edges = [];
+    for (var i = 0; i < 3; i++) {
+      nodes.push(exNode(i, { x: -200 + 200 * i, y: -120 }));
+      nodes.push(exNode(i + 3, { x: -200 + 200 * i, y: 120 }));
+    }
+    for (var a = 0; a < 3; a++)
+      for (var b = 3; b < 6; b++)
+        edges.push(exEdge(a, b));
+    return {
+      meta: { name: 'K3,3 (utility graph)', description: 'Three houses, three utilities — a minimal non-planar graph (6 nodes, 9 edges).' },
+      directed: false, nodes: nodes, edges: edges
+    };
+  }
+
+  // Krackhardt kite: the classic 10-vertex social network for comparing
+  // degree / closeness / betweenness centrality.
+  function kiteGraph() {
+    var pairs = [
+      [1, 2], [1, 3], [2, 3], [2, 4], [3, 4], [3, 5],
+      [4, 5], [4, 6], [5, 6], [5, 7], [6, 7], [6, 8],
+      [7, 8], [7, 9], [8, 9], [8, 10], [9, 10], [7, 10]
+    ];
+    var POS = [
+      { x: -320, y: -150 }, { x: -320, y: 150 }, { x: -170, y: 0 },
+      { x: -70, y: 150 },   { x: -70, y: -150 },  { x: 30, y: 0 },
+      { x: 130, y: 0 },     { x: 240, y: -150 },  { x: 240, y: 150 },
+      { x: 350, y: 0 }
+    ];
+    var nodes = [], edges = [];
+    for (var i = 0; i < 10; i++) nodes.push(exNode(i, POS[i]));
+    pairs.forEach(function (p) { edges.push(exEdge(p[0] - 1, p[1] - 1)); });
+    return {
+      meta: { name: 'Krackhardt kite', description: 'Social-network classic for comparing centrality (10 nodes, 18 edges).' },
+      directed: false, nodes: nodes, edges: edges
+    };
+  }
+
+  // 3-dimensional hypercube (cube graph): 8 vertices, 12 edges, 3-regular.
+  // Nodes are labelled with their 3-bit strings so the structure is readable.
+  function hypercubeGraph() {
+    var bits = ['000', '001', '010', '011', '100', '101', '110', '111'];
+    var POS = [
+      { x: -130, y: -130 }, { x: 130, y: -130 }, { x: -130, y: 130 }, { x: 130, y: 130 },
+      { x: -220, y: -220 }, { x: 40, y: -220 }, { x: -220, y: 40 }, { x: 40, y: 40 }
+    ];
+    var nodes = [], edges = [];
+    for (var i = 0; i < 8; i++) {
+      nodes.push({ id: nodeId(i), label: bits[i], group: '', weight: DEFAULT_WEIGHT, x: POS[i].x, y: POS[i].y });
+    }
+    for (var a = 0; a < 8; a++) {
+      for (var b = a + 1; b < 8; b++) {
+        var d = 0;
+        for (var t = 0; t < 3; t++) if (bits[a][t] !== bits[b][t]) d++;
+        if (d === 1) edges.push(exEdge(a, b));
+      }
+    }
+    return {
+      meta: { name: 'Hypercube Q3', description: '3-dimensional cube: 8 vertices, 12 edges, 3-regular.' },
+      directed: false, nodes: nodes, edges: edges
+    };
+  }
+
+  // Star graph S8: one central hub connected to 7 leaves. The hub gets a higher
+  // node weight so it renders larger (see nodeSize()).
+  function starGraph() {
+    var nodes = [exNode(0, { x: 0, y: 0, weight: 0.75 })];
+    for (var i = 1; i < 8; i++) {
+      var ang = 2 * Math.PI * (i - 1) / 7 - Math.PI / 2;
+      nodes.push(exNode(i, { x: Math.round(230 * Math.cos(ang)), y: Math.round(230 * Math.sin(ang)) }));
+    }
+    var edges = [];
+    for (var j = 1; j < 8; j++) edges.push(exEdge(0, j));
+    return {
+      meta: { name: 'Star (S8)', description: 'Hub-and-spoke: one central node connected to 7 leaves.' },
+      directed: false, nodes: nodes, edges: edges
+    };
+  }
+
+  // Cycle graph C8: a simple ring.
+  function cycleGraph() {
+    var edges = [];
+    for (var i = 0; i < 8; i++) edges.push(exEdge(i, (i + 1) % 8));
+    return {
+      meta: { name: 'Cycle (C8)', description: 'A simple ring of 8 nodes.' },
+      directed: false, nodes: circleNodes(8, 230), edges: edges
+    };
+  }
+
+  // A balanced binary tree (15 nodes, 4 levels): node C(p) has children
+  // C(2p+1) and C(2p+2); positions spread out per level.
+  function treeGraph() {
+    var LEVELS = [[0], [1, 2], [3, 4, 5, 6], [7, 8, 9, 10, 11, 12, 13, 14]];
+    var YS = [-250, -130, -10, 110];
+    var nodes = [], edges = [];
+    for (var l = 0; l < LEVELS.length; l++) {
+      var row = LEVELS[l];
+      var spacing = 280 / (row.length + 1);
+      for (var r = 0; r < row.length; r++) {
+        nodes.push(exNode(row[r], { x: Math.round(-140 + spacing * (r + 1)), y: YS[l] }));
+      }
+    }
+    for (var p = 0; p < 7; p++) {
+      var lc = 2 * p + 1, rc = 2 * p + 2;
+      if (lc < 15) edges.push(exEdge(p, lc));
+      if (rc < 15) edges.push(exEdge(p, rc));
+    }
+    return {
+      meta: { name: 'Binary tree', description: 'Balanced binary tree: 15 nodes in 4 levels (14 edges).' },
+      directed: false, nodes: nodes, edges: edges
+    };
+  }
+
+  // 4×4 grid graph (16 nodes, 24 edges) — a classic for pathfinding demos.
+  function gridGraph() {
+    var nodes = [], edges = [];
+    for (var r = 0; r < 4; r++) {
+      for (var c = 0; c < 4; c++) {
+        nodes.push(exNode(r * 4 + c, { x: (c - 1.5) * 175, y: (r - 1.5) * 175 }));
+      }
+    }
+    for (var i = 0; i < 16; i++) {
+      if (i % 4 < 3) edges.push(exEdge(i, i + 1)); // right neighbour
+      if (i < 12) edges.push(exEdge(i, i + 4));    // lower neighbour
+    }
+    return {
+      meta: { name: 'Grid (4×4)', description: 'A 4-by-4 lattice — handy for pathfinding (16 nodes, 24 edges).' },
+      directed: false, nodes: nodes, edges: edges
+    };
+  }
+
+  // A small directed acyclic graph (7 nodes, 9 edges) for topological-sort and
+  // dependency demos. All edges point downward between the 4 layers.
+  function dagGraph() {
+    var POS = {
+      C1: { x: -140, y: -180 }, C2: { x: 140, y: -180 },
+      C3: { x: -140, y: -60 },  C4: { x: 140, y: -60 },
+      C5: { x: -140, y: 60 },   C6: { x: 140, y: 60 },
+      C7: { x: 0, y: 180 }
+    };
+    var nodes = [];
+    for (var i = 0; i < 7; i++) {
+      var p = POS[nodeId(i)];
+      nodes.push(exNode(i, { x: p.x, y: p.y }));
+    }
+    var pairs = [[0, 2], [0, 3], [1, 2], [1, 3], [2, 4], [3, 4], [3, 5], [4, 6], [5, 6]];
+    var edges = pairs.map(function (p) { return exEdge(p[0], p[1]); });
+    return {
+      meta: { name: 'DAG (directed)', description: 'A small directed acyclic graph for topological-sort demos (7 nodes, 9 edges).' },
+      directed: true, nodes: nodes, edges: edges
+    };
+  }
+
+  // id -> builder for the "Example graphs…" dropdown buttons.
+  var EXAMPLE_BUILDERS = {
+    hubs: sampleGraph,
+    petersen: petersenGraph,
+    k33: k33Graph,
+    kite: kiteGraph,
+    cube: hypercubeGraph,
+    star: starGraph,
+    cycle: cycleGraph,
+    tree: treeGraph,
+    grid: gridGraph,
+    dag: dagGraph
+  };
+
+  function loadExample(id) {
+    var build = EXAMPLE_BUILDERS[id];
+    if (!build) return;
+    var ex = build();
+    var msg = 'Replace the current graph with the "' + ex.meta.name + '" example (' +
+      ex.nodes.length + ' nodes, ' + ex.edges.length + ' edges, ' +
+      (ex.directed ? 'directed' : 'undirected') + ')?\n' +
+      'This removes the current graph (' + graph.nodes.length + ' nodes, ' +
+      graph.edges.length + ' edges).';
+    if (!window.confirm(msg)) return;
+    graph = ex;
+    rebuild();
+    setMessage('Loaded example "' + ex.meta.name + '" (' + ex.nodes.length + ' nodes, ' +
+      ex.edges.length + ' edges).');
+  }
+
+  function toggleExampleMenu() {
+    var menu = document.getElementById('exampleMenu');
+    var wasHidden = menu.hidden;
+    menu.hidden = true;
+    if (wasHidden) menu.hidden = false;
+    var btn = document.getElementById('btnExamples');
+    if (btn) btn.setAttribute('aria-expanded', wasHidden ? 'true' : 'false');
+  }
+
+  function closeExampleMenu() {
+    document.getElementById('exampleMenu').hidden = true;
+    var btn = document.getElementById('btnExamples');
+    if (btn) btn.setAttribute('aria-expanded', 'false');
   }
 
   // -------------------------------------------------------------- normalization
@@ -1676,6 +1932,20 @@
     document.addEventListener('click', function (evt) {
       var wrap = document.getElementById('addNodeWrap');
       if (wrap && !wrap.contains(evt.target)) closeAddNodeMenu();
+    });
+    document.getElementById('btnExamples').addEventListener('click', toggleExampleMenu);
+    var exampleBtns = document.querySelectorAll('#exampleMenu button[data-example]');
+    for (var i = 0; i < exampleBtns.length; i++) {
+      (function (btn) {
+        btn.addEventListener('click', function () {
+          loadExample(btn.getAttribute('data-example'));
+          closeExampleMenu();
+        });
+      })(exampleBtns[i]);
+    }
+    document.addEventListener('click', function (evt) {
+      var wrap = document.getElementById('exampleWrap');
+      if (wrap && !wrap.contains(evt.target)) closeExampleMenu();
     });
     document.getElementById('btnLoad').addEventListener('click', function () {
       document.getElementById('fileInput').click();

@@ -108,6 +108,40 @@ test('loads the sample graph: 8 nodes, 28 edges', async ({ page }) => {
   await expect(page.locator('#nodeList .node-row')).toHaveCount(8);
   await expect(page.locator('#edgeList .edge-row')).toHaveCount(28);
   await expect(page.locator('#stats')).toContainText('28 edges');
+  // The startup sample is the "Two Hubs" example graph.
+  await expect(page.locator('#graphName')).toHaveValue('Two Hubs');
+});
+
+test('loads a named example graph (Petersen) from the Example graphs menu', async ({ page }) => {
+  await page.click('#btnExamples');
+  await expect(page.locator('#exampleMenu')).toBeVisible();
+  page.on('dialog', (d) => d.accept());
+  await page.locator('#exampleMenu button[data-example="petersen"]').click();
+  await settle(page);
+  await expect(page.locator('#nodeList .node-row')).toHaveCount(10);
+  await expect(page.locator('#edgeList .edge-row')).toHaveCount(15);
+  await expect(page.locator('#stats')).toContainText('15 edges');
+  await expect(page.locator('#graphName')).toHaveValue('Petersen graph');
+});
+
+test('cancelling an example load leaves the current graph untouched', async ({ page }) => {
+  await page.click('#btnExamples');
+  page.on('dialog', (d) => d.dismiss());
+  await page.locator('#exampleMenu button[data-example="tree"]').click();
+  await settle(page);
+  await expect(page.locator('#nodeList .node-row')).toHaveCount(8); // sample graph unchanged
+  await expect(page.locator('#edgeList .edge-row')).toHaveCount(28);
+});
+
+test('the DAG example loads in directed mode', async ({ page }) => {
+  await page.click('#btnExamples');
+  page.on('dialog', (d) => d.accept());
+  await page.locator('#exampleMenu button[data-example="dag"]').click();
+  await settle(page);
+  await expect(page.locator('#nodeList .node-row')).toHaveCount(7);
+  await expect(page.locator('#edgeList .edge-row')).toHaveCount(9);
+  await expect(page.locator('#stats')).toContainText('directed');
+  await expect(page.locator('#btnMode')).toHaveText('Mode: directed');
 });
 
 test('adds an isolated node via the Add node menu', async ({ page }) => {

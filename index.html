@@ -84,6 +84,15 @@
   .export-menu button:hover { background: #f1f5f9; }
   /* Add-node submenu drops down left-aligned under its button. */
   .addnode-menu { right: auto; left: 0; }
+  /* Example-graph submenu drops down left-aligned under its button. */
+  .example-menu { right: auto; left: 0; min-width: 200px; }
+  .export-menu .menu-section {
+    padding: 8px 10px 3px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+  }
   #contextMenu {
     position: fixed;
     z-index: 50;
@@ -200,6 +209,23 @@
     <div class="toolbar-group">
       <button id="btnNew" title="Create a complete graph with the given node count">New complete graph</button>
       <input type="number" id="nodeCount" min="1" max="64" value="8" title="Node count for a new complete graph" aria-label="Node count for a new complete graph" />
+      <div class="export-wrap" id="exampleWrap">
+        <button id="btnExamples" title="Load a well-known example graph" aria-haspopup="true" aria-expanded="false">Example graphs…</button>
+        <div class="export-menu example-menu" id="exampleMenu" hidden>
+          <div class="menu-section">Named</div>
+          <button type="button" data-example="hubs">Two Hubs</button>
+          <button type="button" data-example="petersen">Petersen graph</button>
+          <button type="button" data-example="k33">K3,3 (utility)</button>
+          <button type="button" data-example="kite">Krackhardt kite</button>
+          <button type="button" data-example="cube">Hypercube Q3</button>
+          <div class="menu-section">Structural</div>
+          <button type="button" data-example="star">Star (S8)</button>
+          <button type="button" data-example="cycle">Cycle (C8)</button>
+          <button type="button" data-example="tree">Binary tree</button>
+          <button type="button" data-example="grid">Grid (4×4)</button>
+          <button type="button" data-example="dag">DAG (directed)</button>
+        </div>
+      </div>
       <div class="export-wrap" id="addNodeWrap">
         <button id="btnAddNode" title="Add a node (isolated or fully connected)" aria-haspopup="true" aria-expanded="false">Add node</button>
         <div class="export-menu addnode-menu" id="addNodeMenu" hidden>

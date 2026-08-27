@@ -4,6 +4,14 @@
 Current WIP
 -----------
 
+- new **"Example graphs…"** toolbar dropdown with well-known preset graphs. Each
+  one replaces the current graph after a confirmation and renders with a
+  hand-placed or generated layout: **Two Hubs** (the startup sample), Petersen
+  graph, K3,3 (utility), Krackhardt kite, hypercube Q3, star (S8), cycle (C8),
+  balanced binary tree, 4×4 grid, and a small directed DAG (the only directed
+  example — it switches the app into directed mode)
+- the startup sample graph is renamed to **"Two Hubs"** (was "A/B hub example")
+  and is now also reachable from the Example graphs menu
 
 v0.2.0 -- Directed graph support
 ----------------------------------
