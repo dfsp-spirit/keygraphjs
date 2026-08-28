@@ -14,24 +14,18 @@ entirely in the browser — no server, no build step — and reads/writes a simp
 
 Keygraph.js lets you:
 
-- work on **undirected or directed** graphs — a toolbar toggle switches the mode
-  (destructive, with confirmation); the mode is stored in the JSON and shown in the stats,
-- drag nodes and run a one-shot force-directed **auto-layout** (with undo),
-- add and remove nodes, and connect nodes to add edges,
-- edit edge **weights** per edge — any real value (new graphs default to 0–1),
-  via a slider plus a precise number input, or select several and set them all at once,
-- set a **node weight** per node — heavier nodes draw larger and export with the weight,
-- give nodes human-readable **names** and arbitrary **groups** (colors are assigned automatically),
-- toggle edge-weight labels in the view, and
-- **load and save** graphs in JSON or standard formats (GML, GraphML) via the
-  file dialog, and **export** them to GML, GraphML or DOT for other tools.
+- Work on **undirected or directed** graphs
+- Arragne nodes manually or run a one-shot force-directed **auto-layout** (with undo)
+- Graph mutation: add and remove nodes and edges
+- Edit edge **weights** and node weights, any real value (slider, numerical input, edit several at once)
+- Give nodes human-readable **names** and arbitrary **groups** (colors are assigned automatically)
+- Display options: toggle edge-weight and vertex weight labels on/off
+- **Load and save** graphs in JSON or standard formats (GML, GraphML), and **export** them to GML, GraphML or DOT for other tools.
+- Load example graphs from a library of well-known graphs
 
-Directed edges are drawn with arrow tips; a bidirectional pair (A→B and B→A) is shown
-as a single line with an arrowhead at each end, and its two weights are listed as
-`0.90 | 0.30` when edge labels are on.
 
-Open `index.html` directly (works fully offline) or serve it as static files — for example via
-GitHub Pages.
+Keygraph.js is intended for quick editing and online viewing of small to medium sized graphs. If you are interested in studying graphs or networks with many thousands or millions of nodes, need graph algorithms or advanced editing options, obviously use a proper desktop app (Cytoscape, Gephi, whatever).
+
 
 ## Live Demo
 
@@ -46,27 +40,11 @@ Then double-click the `index.html` file to open it with your favorite browser.
 
 If you prefer the terminal:
 
-
-## Import & Export
-
-**Load file…** opens graphs in JSON, **GML** and **GraphML** (the format is
-auto-detected from the file content), so graphs saved by other tools load
-directly. Directedness is detected from the file: GML `directed 1`, GraphML
-`edgedefault="directed"`, or the JSON `directed` flag. **Export…** writes the
-current graph to a standard format:
-
-- **GML** (`.gml`) — compact, plain-text format (igraph, NetworkX, Gephi, yEd).
-- **GraphML** (`.graphml`) — XML with typed attributes; the most widely supported
-  interchange format (NetworkX, Gephi, yEd, Cytoscape, …).
-- **DOT** (`.dot`) — Graphviz's graph description language, great for rendering:
-  `dot -Tpng graph.dot -o graph.png`.
-
-Node labels, groups, edge weights and node weights are preserved in all three;
-node positions (x/y) are included where the format supports them. GML node ids
-are integers, so on import they become the node ids and the labels carry the
-names. Note that in DOT the edge `weight` attribute also acts as a layout hint
-for Graphviz, and DOT has no native node weight — it is emitted there as a
-custom attribute.
+```shell
+git clone https://dfsp-spirit.github.io/keygraphjs/
+cd keygraphjs/
+firefox index.html          # or whatever browser you fancy
+```
 
 ## Development
 
