@@ -15,13 +15,13 @@ entirely in the browser — no server, no build step — and reads/writes a simp
 Keygraph.js lets you:
 
 - Work on **undirected or directed** graphs
-- Arragne nodes manually or run a one-shot force-directed **auto-layout** (with undo)
+- Arrange nodes manually or run a one-shot force-directed **auto-layout** (with undo)
 - Graph mutation: add and remove nodes and edges
 - Edit edge **weights** and node weights, any real value (slider, numerical input, edit several at once)
 - Give nodes human-readable **names** and arbitrary **groups** (colors are assigned automatically)
 - Display options: toggle edge-weight and vertex weight labels on/off
 - **Load and save** graphs in JSON or standard formats (GML, GraphML), and **export** them to GML, GraphML or DOT for other tools.
-- Load example graphs from a library of well-known graphs
+- Load example graphs from an in-built library of well-known graphs
 
 
 Keygraph.js is intended for quick editing and online viewing of small to medium sized graphs. If you are interested in studying graphs or networks with many thousands or millions of nodes, need graph algorithms or advanced editing options, obviously use a proper desktop app (Cytoscape, Gephi, whatever).
