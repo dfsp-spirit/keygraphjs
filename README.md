@@ -24,7 +24,7 @@ Keygraph.js lets you:
 - Load example graphs from an in-built library of well-known graphs
 
 
-Keygraph.js is intended for quick editing and online viewing of small to medium sized graphs. If you are interested in studying graphs or networks with many thousands or millions of nodes, need graph algorithms or advanced editing options, obviously use a proper desktop app (Cytoscape, Gephi, whatever).
+Keygraph.js is intended for quick editing and online viewing of small to medium sized graphs. If you are interested in studying graphs or networks with many thousands or millions of nodes, need graph algorithms or advanced editing options, obviously use a proper desktop app (Cytoscape, Gephi, whatever). You can always start in Keygraph.js and switch later if needed, as we export in standard formats.
 
 
 ## Live Demo
